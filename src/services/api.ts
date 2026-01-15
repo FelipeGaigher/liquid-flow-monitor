@@ -1,333 +1,857 @@
-import { mockSites, mockTanks, mockMovements, mockPriceLists, mockUsers } from "@/mocks/seed";
-import { DashboardFilters, KPIs, Movement, Tank, ProductType } from "@/types";
+import { DashboardFilters, KPIs, Movement, ProductType, Tank, User, Site, PriceList } from "@/types";
+import { mockMovements, mockPriceLists, mockSites, mockTanks, mockUsers } from "@/mocks/seed";
 
-// Simula delay de rede
-const delay = (ms: number = 300) => new Promise(resolve => setTimeout(resolve, ms));
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
+const TOKEN_STORAGE_KEY = "lfm.auth";
+const MOCK_STORAGE_KEY = "lfm.mock";
+const MOCK_VERSION = 1;
 
-// Estado em memória
-let tanks = [...mockTanks];
-let movements = [...mockMovements];
-let priceLists = [...mockPriceLists];
-let users = [...mockUsers];
-const sites = [...mockSites];
+type MockProduct = { id: string; name: string; type: ProductType; status: "active" | "inactive" };
 
-// Helper: filtra movimentos pelos filtros globais
-function filterMovements(filters: DashboardFilters): Movement[] {
-  const { period, customDateRange, products, tankIds, siteIds, operatorIds, movementTypes } = filters;
-  
-  let filtered = [...movements];
+type MockState = {
+  version: number;
+  tanks: Tank[];
+  sites: Site[];
+  movements: Movement[];
+  users: User[];
+  priceLists: PriceList[];
+  products: MockProduct[];
+};
 
-  // Filtro de período
-  const now = new Date();
-  let startDate = new Date();
-  
-  switch (period) {
-    case "hoje":
-      startDate.setHours(0, 0, 0, 0);
-      break;
-    case "semana":
-      startDate.setDate(now.getDate() - 7);
-      break;
-    case "mes":
-      startDate.setMonth(now.getMonth() - 1);
-      break;
-    case "3m":
-      startDate.setMonth(now.getMonth() - 3);
-      break;
-    case "6m":
-      startDate.setMonth(now.getMonth() - 6);
-      break;
-    case "ano":
-      startDate.setFullYear(now.getFullYear() - 1);
-      break;
-    case "custom":
-      if (customDateRange) startDate = customDateRange.start;
-      break;
+let inMemoryMockState: MockState | null = null;
+
+type AuthTokens = {
+  accessToken: string;
+  refreshToken: string;
+};
+
+class ApiError extends Error {
+  status: number;
+  code?: string;
+  details?: unknown;
+
+  constructor(message: string, status: number, code?: string, details?: unknown) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.details = details;
   }
-
-  filtered = filtered.filter(m => new Date(m.created_at) >= startDate);
-  if (period === "custom" && customDateRange) {
-    filtered = filtered.filter(m => new Date(m.created_at) <= customDateRange.end);
-  }
-
-  // Filtros de produto
-  if (products.length > 0) {
-    filtered = filtered.filter(m => products.includes(m.product));
-  }
-
-  // Filtros de tanque
-  if (tankIds.length > 0) {
-    filtered = filtered.filter(m => tankIds.includes(m.tank_id));
-  }
-
-  // Filtros de site
-  if (siteIds.length > 0) {
-    const tanksInSites = tanks.filter(t => siteIds.includes(t.site_id)).map(t => t.id);
-    filtered = filtered.filter(m => tanksInSites.includes(m.tank_id));
-  }
-
-  // Filtros de operador
-  if (operatorIds.length > 0) {
-    filtered = filtered.filter(m => operatorIds.includes(m.operator_id));
-  }
-
-  // Filtros de tipo de movimentação
-  if (movementTypes.length > 0) {
-    filtered = filtered.filter(m => movementTypes.includes(m.type));
-  }
-
-  return filtered;
 }
 
-// Calcula KPIs
-function calculateKPIs(filtered: Movement[], period: DashboardFilters["period"]): KPIs {
-  const saidas = filtered.filter(m => m.type === "saída");
-  
-  const revenue = saidas.reduce((sum, m) => sum + m.total_value, 0);
-  const volume = saidas.reduce((sum, m) => sum + m.volume_l, 0);
-  const cogs = saidas.reduce((sum, m) => sum + (m.total_cost || 0), 0);
-  const profit = revenue - cogs;
-  const margin = revenue > 0 ? (profit / revenue) * 100 : 0;
-  const avgTicket = saidas.length > 0 ? revenue / saidas.length : 0;
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
 
-  // Calcula crescimentos (mock simples)
-  const revenueGrowth = Math.random() * 20 - 5;
-  const profitGrowth = Math.random() * 25 - 5;
-  const volumeGrowth = Math.random() * 15 - 3;
-
+function buildMockSeed(): MockState {
   return {
-    revenue,
-    volume,
-    cogs,
-    profit,
-    margin,
-    avgTicket,
-    revenueGrowth,
-    profitGrowth,
-    volumeGrowth,
+    version: MOCK_VERSION,
+    tanks: clone(mockTanks),
+    sites: clone(mockSites),
+    movements: clone(mockMovements),
+    users: clone(mockUsers),
+    priceLists: clone(mockPriceLists),
+    products: [
+      { id: "prod-1", name: "Álcool", type: "Álcool", status: "active" },
+      { id: "prod-2", name: "Cachaça", type: "Cachaça", status: "active" },
+    ],
   };
 }
 
-export async function getDashboardData(filters: DashboardFilters) {
-  await delay();
-  
-  const filtered = filterMovements(filters);
-  const kpis = calculateKPIs(filtered, filters.period);
+function saveMockState(state: MockState) {
+  inMemoryMockState = state;
+  try {
+    localStorage.setItem(MOCK_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore storage errors (private mode, quota, etc).
+  }
+}
 
-  // Vendas por produto (donut)
-  const salesByProduct = filtered
-    .filter(m => m.type === "saída")
-    .reduce((acc, m) => {
-      acc[m.product] = (acc[m.product] || 0) + m.total_value;
-      return acc;
-    }, {} as Record<ProductType, number>);
+function getMockState(): MockState {
+  if (inMemoryMockState) return inMemoryMockState;
+  if (typeof window === "undefined") {
+    inMemoryMockState = buildMockSeed();
+    return inMemoryMockState;
+  }
 
-  // Faturamento por período (série temporal)
-  const revenueTimeSeries = generateTimeSeries(filtered, filters.period);
+  const raw = localStorage.getItem(MOCK_STORAGE_KEY);
+  if (!raw) {
+    const seed = buildMockSeed();
+    saveMockState(seed);
+    return seed;
+  }
 
-  // Lucro por produto
-  const profitByProduct = filtered
-    .filter(m => m.type === "saída")
-    .reduce((acc, m) => {
-      if (!acc[m.product]) acc[m.product] = { profit: 0, revenue: 0 };
-      acc[m.product].profit += m.profit || 0;
-      acc[m.product].revenue += m.total_value;
-      return acc;
-    }, {} as Record<ProductType, { profit: number; revenue: number }>);
+  try {
+    const parsed = JSON.parse(raw) as MockState;
+    if (!parsed || parsed.version !== MOCK_VERSION) throw new Error("invalid mock cache");
+    inMemoryMockState = parsed;
+    return parsed;
+  } catch {
+    const seed = buildMockSeed();
+    saveMockState(seed);
+    return seed;
+  }
+}
 
-  // Top 5 tanques por faturamento
-  const topTanks = filtered
-    .filter(m => m.type === "saída")
-    .reduce((acc, m) => {
-      acc[m.tank_id] = (acc[m.tank_id] || 0) + m.total_value;
-      return acc;
-    }, {} as Record<string, number>);
+function isOfflineError(error: unknown): boolean {
+  if (error instanceof TypeError) return true;
+  const message = error instanceof Error ? error.message : "";
+  return message.includes("Failed to fetch") || message.includes("NetworkError");
+}
 
-  const top5Tanks = Object.entries(topTanks)
-    .sort(([, a], [, b]) => b - a)
-    .slice(0, 5)
+function getStoredTokens(): AuthTokens | null {
+  const raw = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AuthTokens;
+  } catch {
+    return null;
+  }
+}
+
+export function hasStoredTokens(): boolean {
+  return Boolean(getStoredTokens());
+}
+
+function storeTokens(tokens: AuthTokens) {
+  localStorage.setItem(TOKEN_STORAGE_KEY, JSON.stringify(tokens));
+}
+
+function clearTokens() {
+  localStorage.removeItem(TOKEN_STORAGE_KEY);
+}
+
+function notifyAuthExpired() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("auth:expired"));
+}
+
+async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+  try {
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) {
+      clearTokens();
+      return null;
+    }
+
+    const data = await response.json();
+    const current = getStoredTokens();
+    if (!current) return null;
+
+    const updated: AuthTokens = {
+      accessToken: data.access_token,
+      refreshToken: current.refreshToken,
+    };
+    storeTokens(updated);
+    return updated.accessToken;
+  } catch {
+    clearTokens();
+    return null;
+  }
+}
+
+async function apiRequest<T>(
+  path: string,
+  options: RequestInit & { auth?: boolean } = {},
+  retry = true
+): Promise<T> {
+  const { auth = true, headers, body, ...rest } = options;
+  const tokens = auth ? getStoredTokens() : null;
+  const finalHeaders: HeadersInit = {
+    Accept: "application/json",
+    ...(headers || {}),
+  };
+
+  let payload = body;
+  if (body && !(body instanceof FormData)) {
+    finalHeaders["Content-Type"] = "application/json";
+    payload = JSON.stringify(body);
+  }
+
+  if (tokens?.accessToken) {
+    finalHeaders.Authorization = `Bearer ${tokens.accessToken}`;
+  }
+
+  const response = await fetch(`${API_URL}${path}`, {
+    ...rest,
+    headers: finalHeaders,
+    body: payload,
+  });
+
+  let authExpired = false;
+  if (response.status === 401 && retry && tokens?.refreshToken) {
+    const newToken = await refreshAccessToken(tokens.refreshToken);
+    if (newToken) {
+      return apiRequest(path, options, false);
+    }
+    authExpired = true;
+  }
+
+  if (auth && response.status === 401 && !tokens?.refreshToken) {
+    clearTokens();
+    notifyAuthExpired();
+  }
+
+  if (auth && response.status === 401 && authExpired) {
+    clearTokens();
+    notifyAuthExpired();
+  }
+
+  if (!response.ok) {
+    const errorBody = await safeJson(response);
+    const errorMessage = errorBody?.error?.message || response.statusText || "Erro na requisicao";
+    throw new ApiError(errorMessage, response.status, errorBody?.error?.code, errorBody?.error?.details);
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  return (await safeJson(response)) as T;
+}
+
+async function safeJson(response: Response) {
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function buildQuery(params: Record<string, string | number | string[] | undefined>) {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined) return;
+    if (Array.isArray(value)) {
+      if (value.length === 0) return;
+      search.set(key, value.join(","));
+      return;
+    }
+    if (value === "") return;
+    search.set(key, String(value));
+  });
+  const query = search.toString();
+  return query ? `?${query}` : "";
+}
+
+function toApiProduct(value: ProductType | "Ambos") {
+  if (value === "Álcool") return "Alcool";
+  if (value === "Cachaça") return "Cachaca";
+  return value;
+}
+
+function toUiProduct(value: string): ProductType | "Ambos" {
+  if (value === "Alcool") return "Álcool";
+  if (value === "Cachaca") return "Cachaça";
+  if (value === "Ambos") return "Ambos";
+  return "Álcool";
+}
+
+function toApiMovementType(value: Movement["type"]) {
+  if (value === "saída") return "saida";
+  return value;
+}
+
+function toUiMovementType(value: string): Movement["type"] {
+  if (value === "saida") return "saída";
+  if (value === "entrada" || value === "ajuste") return value;
+  return "entrada";
+}
+
+function mapTankFromApi(payload: any): Tank {
+  return {
+    id: payload.id,
+    name: payload.name,
+    product: toUiProduct(payload.product),
+    capacity_l: Number(payload.capacity_l),
+    current_volume_l: Number(payload.current_volume_l),
+    min_alert_l: Number(payload.min_alert_l),
+    site_id: payload.site_id,
+    status: payload.status,
+  };
+}
+
+function mapMovementFromApi(payload: any): Movement {
+  return {
+    id: payload.id,
+    tank_id: payload.tank_id,
+    product: toUiProduct(payload.product) as ProductType,
+    type: toUiMovementType(payload.type),
+    volume_l: Number(payload.volume_l),
+    price_per_l: payload.price_per_l ? Number(payload.price_per_l) : undefined,
+    cost_per_l: payload.cost_per_l ? Number(payload.cost_per_l) : undefined,
+    total_value: payload.total_value ? Number(payload.total_value) : 0,
+    total_cost: payload.total_cost ? Number(payload.total_cost) : undefined,
+    profit: payload.profit ? Number(payload.profit) : undefined,
+    reference: payload.reference ?? undefined,
+    notes: payload.notes ?? undefined,
+    operator_id: payload.operator_id,
+    created_at: payload.created_at,
+  };
+}
+
+const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+
+function resolvePeriod(filters: DashboardFilters) {
+  const now = new Date();
+  let start = new Date(now);
+
+  switch (filters.period) {
+    case "hoje":
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      break;
+    case "semana":
+      start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      break;
+    case "mes":
+      start = new Date(now);
+      start.setMonth(start.getMonth() - 1);
+      break;
+    case "3m":
+      start = new Date(now);
+      start.setMonth(start.getMonth() - 3);
+      break;
+    case "6m":
+      start = new Date(now);
+      start.setMonth(start.getMonth() - 6);
+      break;
+    case "ano":
+      start = new Date(now);
+      start.setFullYear(start.getFullYear() - 1);
+      break;
+    case "custom":
+      if (filters.customDateRange?.start) start = filters.customDateRange.start;
+      if (filters.customDateRange?.end) return { start, end: filters.customDateRange.end };
+      break;
+    default:
+      break;
+  }
+
+  return { start, end: now };
+}
+
+function previousPeriod(start: Date, end: Date) {
+  const diff = end.getTime() - start.getTime();
+  return { prevStart: new Date(start.getTime() - diff), prevEnd: new Date(start.getTime()) };
+}
+
+function calculateGrowth(current: number, previous: number): number {
+  if (previous <= 0) return 0;
+  return ((current - previous) / previous) * 100;
+}
+
+function filterMovements(
+  movements: Movement[],
+  tanks: Tank[],
+  filters: DashboardFilters,
+  start: Date,
+  end: Date
+) {
+  const tankById = new Map(tanks.map((tank) => [tank.id, tank]));
+
+  return movements.filter((movement) => {
+    const createdAt = new Date(movement.created_at);
+    if (createdAt < start || createdAt > end) return false;
+    if (filters.products.length > 0 && !filters.products.includes(movement.product)) return false;
+    if (filters.tankIds.length > 0 && !filters.tankIds.includes(movement.tank_id)) return false;
+    if (filters.operatorIds.length > 0 && !filters.operatorIds.includes(movement.operator_id)) return false;
+    if (filters.movementTypes.length > 0 && !filters.movementTypes.includes(movement.type)) return false;
+    if (filters.siteIds.length > 0) {
+      const tank = tankById.get(movement.tank_id);
+      if (!tank || !filters.siteIds.includes(tank.site_id)) return false;
+    }
+    return true;
+  });
+}
+
+function buildEmptyHeatmap() {
+  const grid: { day: string; hour: number; value: number }[] = [];
+  for (let dow = 0; dow < 7; dow += 1) {
+    for (let hour = 0; hour < 24; hour += 1) {
+      grid.push({ day: dayLabels[dow], hour, value: 0 });
+    }
+  }
+  return grid;
+}
+
+function buildMockDashboard(filters: DashboardFilters) {
+  const state = getMockState();
+  const { start, end } = resolvePeriod(filters);
+  const includesSaida = filters.movementTypes.length === 0 || filters.movementTypes.includes("saída");
+
+  if (!includesSaida) {
+    return {
+      kpis: {
+        revenue: 0,
+        volume: 0,
+        cogs: 0,
+        profit: 0,
+        margin: 0,
+        avgTicket: 0,
+        revenueGrowth: 0,
+        profitGrowth: 0,
+        volumeGrowth: 0,
+      },
+      salesByProduct: {},
+      revenueTimeSeries: [],
+      profitByProduct: {},
+      top5Tanks: [],
+      heatmap: buildEmptyHeatmap(),
+    };
+  }
+
+  const base = filterMovements(state.movements, state.tanks, filters, start, end);
+  const saidas = base.filter((movement) => movement.type === "saída");
+
+  const kpiValues = (movements: Movement[]) => {
+    const revenue = movements.reduce((sum, m) => sum + (m.total_value || 0), 0);
+    const volume = movements.reduce((sum, m) => sum + (m.volume_l || 0), 0);
+    const cogs = movements.reduce((sum, m) => sum + (m.total_cost || 0), 0);
+    const profit = movements.reduce((sum, m) => sum + (m.profit || 0), 0);
+    const count = movements.length;
+    return { revenue, volume, cogs, profit, count };
+  };
+
+  const current = kpiValues(saidas);
+  const { prevStart, prevEnd } = previousPeriod(start, end);
+  const prevBase = filterMovements(state.movements, state.tanks, filters, prevStart, prevEnd)
+    .filter((movement) => movement.type === "saída");
+  const previous = kpiValues(prevBase);
+
+  const salesByProduct = saidas.reduce<Record<string, number>>((acc, movement) => {
+    acc[movement.product] = (acc[movement.product] || 0) + (movement.total_value || 0);
+    return acc;
+  }, {});
+
+  const groupByDay = filters.period === "hoje" || filters.period === "semana";
+  const revenueTimeSeries = saidas.reduce<Record<string, number>>((acc, movement) => {
+    const date = new Date(movement.created_at);
+    const key = groupByDay
+      ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
+      : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    acc[key] = (acc[key] || 0) + (movement.total_value || 0);
+    return acc;
+  }, {});
+
+  const profitByProduct = saidas.reduce<Record<string, { profit: number; revenue: number }>>((acc, movement) => {
+    const key = movement.product;
+    if (!acc[key]) acc[key] = { profit: 0, revenue: 0 };
+    acc[key].profit += movement.profit || 0;
+    acc[key].revenue += movement.total_value || 0;
+    return acc;
+  }, {});
+
+  const tankRevenue = saidas.reduce<Record<string, number>>((acc, movement) => {
+    acc[movement.tank_id] = (acc[movement.tank_id] || 0) + (movement.total_value || 0);
+    return acc;
+  }, {});
+  const top5Tanks = Object.entries(tankRevenue)
     .map(([tankId, revenue]) => ({
       tankId,
-      tankName: tanks.find(t => t.id === tankId)?.name || "N/A",
+      tankName: state.tanks.find((tank) => tank.id === tankId)?.name || "Tanque",
       revenue,
-    }));
+    }))
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 5);
 
-  // Heatmap vendas por hora x dia
-  const heatmap = generateHeatmap(filtered);
+  const heatmap = buildEmptyHeatmap();
+  for (const movement of saidas) {
+    const date = new Date(movement.created_at);
+    const day = dayLabels[date.getDay()];
+    const hour = date.getHours();
+    const entry = heatmap.find((row) => row.day === day && row.hour === hour);
+    if (entry) entry.value += movement.total_value || 0;
+  }
 
   return {
-    kpis,
+    kpis: {
+      revenue: current.revenue,
+      volume: current.volume,
+      cogs: current.cogs,
+      profit: current.profit,
+      margin: current.revenue > 0 ? (current.profit / current.revenue) * 100 : 0,
+      avgTicket: current.count > 0 ? current.revenue / current.count : 0,
+      revenueGrowth: calculateGrowth(current.revenue, previous.revenue),
+      profitGrowth: calculateGrowth(current.profit, previous.profit),
+      volumeGrowth: calculateGrowth(current.volume, previous.volume),
+    },
     salesByProduct,
-    revenueTimeSeries,
+    revenueTimeSeries: Object.entries(revenueTimeSeries)
+      .map(([date, revenue]) => ({ date, revenue }))
+      .sort((a, b) => a.date.localeCompare(b.date)),
     profitByProduct,
     top5Tanks,
     heatmap,
   };
 }
 
-function generateTimeSeries(movements: Movement[], period: DashboardFilters["period"]) {
-  const series: { date: string; revenue: number }[] = [];
-  
-  movements
-    .filter(m => m.type === "saída")
-    .forEach(m => {
-      const date = new Date(m.created_at);
-      const key = period === "hoje" || period === "semana" 
-        ? date.toISOString().split("T")[0]
-        : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
-      
-      const existing = series.find(s => s.date === key);
-      if (existing) {
-        existing.revenue += m.total_value;
-      } else {
-        series.push({ date: key, revenue: m.total_value });
-      }
-    });
+function filterMovementsForList(
+  movements: Movement[],
+  filters: Partial<DashboardFilters> = {}
+) {
+  const tankId = filters.tankIds?.[0];
+  const product = filters.products?.[0];
+  const type = filters.movementTypes?.[0];
+  const operatorId = filters.operatorIds?.[0];
 
-  return series.sort((a, b) => a.date.localeCompare(b.date));
+  return movements.filter((movement) => {
+    if (tankId && movement.tank_id !== tankId) return false;
+    if (product && movement.product !== product) return false;
+    if (type && movement.type !== type) return false;
+    if (operatorId && movement.operator_id !== operatorId) return false;
+    return true;
+  });
 }
 
-function generateHeatmap(movements: Movement[]) {
-  const heatmap: { day: string; hour: number; value: number }[] = [];
-  const days = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-  
-  for (let day = 0; day < 7; day++) {
-    for (let hour = 0; hour < 24; hour++) {
-      const value = movements
-        .filter(m => {
-          const d = new Date(m.created_at);
-          return d.getDay() === day && d.getHours() === hour && m.type === "saída";
-        })
-        .reduce((sum, m) => sum + m.total_value, 0);
-      
-      heatmap.push({ day: days[day], hour, value });
+export async function getDashboardData(filters: DashboardFilters) {
+  const query = buildQuery({
+    period: filters.period,
+    start_date: filters.period === "custom" ? filters.customDateRange?.start?.toISOString() : undefined,
+    end_date: filters.period === "custom" ? filters.customDateRange?.end?.toISOString() : undefined,
+    products: filters.products.map(toApiProduct),
+    tank_ids: filters.tankIds,
+    site_ids: filters.siteIds,
+    operator_ids: filters.operatorIds,
+    movement_types: filters.movementTypes.map(toApiMovementType),
+  });
+
+  try {
+    return await apiRequest<{ kpis: KPIs; [key: string]: unknown }>(`/dashboard${query}`);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return buildMockDashboard(filters);
     }
+    throw error;
   }
-  
-  return heatmap;
 }
 
-export async function listTanks() {
-  await delay();
-  return tanks;
+export async function listTanks(): Promise<Tank[]> {
+  try {
+    const response = await apiRequest<{ data: any[] }>("/tanks");
+    return response.data.map(mapTankFromApi);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().tanks;
+    }
+    throw error;
+  }
 }
 
-export async function listSites() {
-  await delay();
-  return sites;
+export async function createTank(payload: Omit<Tank, "id" | "status"> & { status?: Tank["status"] }) {
+  try {
+    const response = await apiRequest<any>("/tanks", {
+      method: "POST",
+      body: {
+        name: payload.name,
+        site_id: payload.site_id,
+        product: toApiProduct(payload.product),
+        capacity_l: payload.capacity_l,
+        current_volume_l: payload.current_volume_l,
+        min_alert_l: payload.min_alert_l,
+      },
+    });
+    return mapTankFromApi(response);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      const state = getMockState();
+      const newTank: Tank = {
+        id: `tank-local-${Date.now()}`,
+        name: payload.name,
+        site_id: payload.site_id,
+        product: payload.product,
+        capacity_l: payload.capacity_l,
+        current_volume_l: payload.current_volume_l,
+        min_alert_l: payload.min_alert_l,
+        status: payload.status ?? "active",
+      };
+      state.tanks = [...state.tanks, newTank];
+      saveMockState(state);
+      return newTank;
+    }
+    throw error;
+  }
+}
+
+export async function listSites(): Promise<Site[]> {
+  try {
+    const response = await apiRequest<{ data: Site[] }>("/sites");
+    return response.data;
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().sites;
+    }
+    throw error;
+  }
 }
 
 export async function listProducts() {
-  await delay();
-  return [
-    { id: "alcohol", name: "Álcool", type: "Álcool" as ProductType },
-    { id: "cachaca", name: "Cachaça", type: "Cachaça" as ProductType },
-  ];
+  try {
+    const response = await apiRequest<{ data: Array<{ id: string; name: string; status: string }> }>("/products");
+    return response.data.map((product) => ({
+      id: product.id,
+      name: toUiProduct(product.name) as string,
+      type: toUiProduct(product.name) as ProductType,
+      status: product.status,
+    }));
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().products;
+    }
+    throw error;
+  }
 }
 
-export async function listUsers() {
-  await delay();
-  return users;
+export async function listUsers(): Promise<User[]> {
+  try {
+    const response = await apiRequest<{ data: User[] }>("/users");
+    return response.data;
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().users;
+    }
+    throw error;
+  }
 }
 
-export async function listMovements(filters?: Partial<DashboardFilters>, page: number = 1, pageSize: number = 20) {
-  await delay();
-  
-  const defaultFilters: DashboardFilters = {
-    period: "mes",
-    products: [],
-    tankIds: [],
-    siteIds: [],
-    operatorIds: [],
-    movementTypes: [],
-    ...filters,
-  };
-
-  const filtered = filterMovements(defaultFilters);
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize;
-  
-  return {
-    data: filtered.slice(start, end),
-    total: filtered.length,
+export async function listMovements(
+  filters: Partial<DashboardFilters> = {},
+  page = 1,
+  pageSize = 20
+) {
+  const query = buildQuery({
+    tank_id: filters.tankIds?.[0],
+    product: filters.products?.[0] ? toApiProduct(filters.products[0]) : undefined,
+    type: filters.movementTypes?.[0] ? toApiMovementType(filters.movementTypes[0]) : undefined,
+    operator_id: filters.operatorIds?.[0],
     page,
-    pageSize,
-  };
+    limit: pageSize,
+  });
+
+  try {
+    const response = await apiRequest<{ data: any[]; pagination: { total: number; page: number; limit: number } }>(
+      `/movements${query}`
+    );
+    return {
+      data: response.data.map(mapMovementFromApi),
+      total: response.pagination.total,
+      page: response.pagination.page,
+      pageSize: response.pagination.limit,
+    };
+  } catch (error) {
+    if (isOfflineError(error)) {
+      const state = getMockState();
+      const filtered = filterMovementsForList(state.movements, filters);
+      const sorted = [...filtered].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      const start = (page - 1) * pageSize;
+      return {
+        data: sorted.slice(start, start + pageSize),
+        total: filtered.length,
+        page,
+        pageSize,
+      };
+    }
+    throw error;
+  }
 }
 
 export async function createMovement(payload: Omit<Movement, "id" | "created_at">) {
-  await delay(500);
-  
-  const newMovement: Movement = {
-    ...payload,
-    id: `mov-${Date.now()}`,
-    created_at: new Date().toISOString(),
-  };
+  try {
+    const response = await apiRequest<any>("/movements", {
+      method: "POST",
+      body: {
+        tank_id: payload.tank_id,
+        type: toApiMovementType(payload.type),
+        volume_l: payload.volume_l,
+        price_per_l: payload.price_per_l,
+        cost_per_l: payload.cost_per_l,
+        reference: payload.reference,
+        notes: payload.notes,
+      },
+    });
 
-  movements.unshift(newMovement);
+    return mapMovementFromApi({
+      ...response,
+      tank_id: response.tank?.id ?? payload.tank_id,
+      operator_id: response.operator?.id ?? payload.operator_id,
+    });
+  } catch (error) {
+    if (isOfflineError(error)) {
+      const state = getMockState();
+      const createdAt = new Date().toISOString();
+      const movement: Movement = {
+        ...payload,
+        id: `mov-local-${Date.now()}`,
+        created_at: createdAt,
+      };
 
-  // Atualiza saldo do tanque
-  const tank = tanks.find(t => t.id === payload.tank_id);
-  if (tank) {
-    if (payload.type === "entrada") {
-      tank.current_volume_l += payload.volume_l;
-    } else if (payload.type === "saída") {
-      tank.current_volume_l -= payload.volume_l;
-    } else {
-      tank.current_volume_l = payload.volume_l;
+      const tankIndex = state.tanks.findIndex((tank) => tank.id === payload.tank_id);
+      if (tankIndex >= 0) {
+        const tank = state.tanks[tankIndex];
+        let nextVolume = tank.current_volume_l;
+        if (payload.type === "entrada") nextVolume += payload.volume_l;
+        if (payload.type === "saída") nextVolume -= payload.volume_l;
+        if (payload.type === "ajuste") nextVolume = payload.volume_l;
+        state.tanks[tankIndex] = { ...tank, current_volume_l: Math.max(nextVolume, 0) };
+      }
+
+      state.movements = [movement, ...state.movements];
+      saveMockState(state);
+      return movement;
     }
+    throw error;
   }
-
-  return newMovement;
 }
 
-export async function listPriceLists() {
-  await delay();
-  return priceLists;
+export async function listPriceLists(): Promise<PriceList[]> {
+  try {
+    const response = await apiRequest<{ data: any[] }>("/price-lists");
+    return response.data.map((price) => ({
+      id: price.id,
+      product: toUiProduct(price.product_name) as ProductType,
+      valid_from: price.valid_from,
+      price_per_l: Number(price.price_per_l),
+      status: price.status,
+    }));
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().priceLists;
+    }
+    throw error;
+  }
 }
 
 export async function createPrice(productType: ProductType, data: { valid_from: string; price_per_l: number }) {
-  await delay();
-  
-  const status: "futuro" | "vigente" = new Date(data.valid_from) > new Date() ? "futuro" : "vigente";
-  
-  const newPrice = {
-    id: `price-${Date.now()}`,
-    product: productType,
-    valid_from: data.valid_from,
-    price_per_l: data.price_per_l,
-    status,
-  };
+  try {
+    const products = await listProducts();
+    const match = products.find((product) => product.type === productType);
+    if (!match) {
+      throw new ApiError("Produto nao encontrado", 404, "PRODUCT_NOT_FOUND");
+    }
 
-  priceLists.push(newPrice);
-  return newPrice;
+    const response = await apiRequest<any>("/price-lists", {
+      method: "POST",
+      body: {
+        product_id: match.id,
+        price_per_l: data.price_per_l,
+        valid_from: data.valid_from,
+      },
+    });
+
+    return {
+      id: response.id,
+      product: productType,
+      valid_from: response.valid_from,
+      price_per_l: Number(response.price_per_l),
+      status: response.status,
+    } as PriceList;
+  } catch (error) {
+    if (isOfflineError(error)) {
+      const state = getMockState();
+      const validFrom = new Date(data.valid_from);
+      const now = new Date();
+      const status: PriceList["status"] = validFrom <= now ? "vigente" : "futuro";
+      if (status === "vigente") {
+        state.priceLists = state.priceLists.map((price) =>
+          price.product === productType && price.status === "vigente"
+            ? { ...price, status: "expirado" }
+            : price
+        );
+      }
+      const newPrice: PriceList = {
+        id: `price-local-${Date.now()}`,
+        product: productType,
+        valid_from: data.valid_from,
+        price_per_l: data.price_per_l,
+        status,
+      };
+      state.priceLists = [newPrice, ...state.priceLists];
+      saveMockState(state);
+      return newPrice;
+    }
+    throw error;
+  }
 }
 
 export async function resetDemoData() {
-  await delay();
-  
-  tanks = [...mockTanks];
-  movements = [...mockMovements];
-  priceLists = [...mockPriceLists];
-  users = [...mockUsers];
-
-  return { success: true };
+  const seed = buildMockSeed();
+  saveMockState(seed);
+  return seed;
 }
 
 export async function getTankById(id: string): Promise<Tank | undefined> {
-  await delay();
-  return tanks.find(t => t.id === id);
+  try {
+    const response = await apiRequest<any>(`/tanks/${id}`);
+    return mapTankFromApi(response);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().tanks.find((tank) => tank.id === id);
+    }
+    throw error;
+  }
 }
 
 export async function getCurrentPrice(product: ProductType): Promise<number | null> {
-  await delay();
-  const now = new Date();
-  const validPrices = priceLists.filter(
-    p => p.product === product && new Date(p.valid_from) <= now
-  );
-  
-  if (validPrices.length === 0) return null;
-  
-  validPrices.sort((a, b) => new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime());
-  return validPrices[0].price_per_l;
+  try {
+    const response = await apiRequest<any>(`/prices/current/${toApiProduct(product)}`);
+    return response.price ? Number(response.price.price_per_l) : null;
+  } catch (error) {
+    if (isOfflineError(error)) {
+      const now = new Date();
+      const prices = getMockState().priceLists.filter((price) => price.product === product);
+      const current = prices
+        .filter((price) => new Date(price.valid_from) <= now)
+        .sort((a, b) => new Date(b.valid_from).getTime() - new Date(a.valid_from).getTime())[0];
+      return current ? current.price_per_l : null;
+    }
+    throw error;
+  }
+}
+
+export async function login(email: string, password: string) {
+  const response = await apiRequest<any>("/auth/login", {
+    method: "POST",
+    auth: false,
+    body: { email, password },
+  });
+
+  storeTokens({
+    accessToken: response.access_token,
+    refreshToken: response.refresh_token,
+  });
+
+  return response;
+}
+
+export async function logout() {
+  const tokens = getStoredTokens();
+  try {
+    if (tokens?.accessToken) {
+      await apiRequest("/auth/logout", { method: "POST" });
+    }
+  } finally {
+    clearTokens();
+  }
+}
+
+export async function getCurrentUser() {
+  return apiRequest("/auth/me");
+}
+
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return apiRequest("/auth/password", {
+    method: "PUT",
+    body: {
+      current_password: currentPassword,
+      new_password: newPassword,
+    },
+  });
 }

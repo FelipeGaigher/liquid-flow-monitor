@@ -22,6 +22,8 @@ import {
   Bar,
 } from "recharts";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 const COLORS = {
   Álcool: "hsl(var(--chart-1))",
@@ -33,12 +35,14 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<any>(null);
   const [tanks, setTanks] = useState<Tank[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedTank, setSelectedTank] = useState<string>();
   const [selectedType, setSelectedType] = useState<MovementType>();
 
   const loadData = async () => {
     setLoading(true);
+    setError(null);
     try {
       const [dashData, tanksData] = await Promise.all([
         getDashboardData(filters),
@@ -46,6 +50,11 @@ const Dashboard = () => {
       ]);
       setData(dashData);
       setTanks(tanksData);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar dados do dashboard";
+      setError(message);
+      setData(null);
+      setTanks([]);
     } finally {
       setLoading(false);
     }
@@ -67,7 +76,7 @@ const Dashboard = () => {
     setSelectedType(undefined);
   };
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-6">
@@ -77,6 +86,20 @@ const Dashboard = () => {
             ))}
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="p-6 space-y-4">
+        <Alert variant="destructive">
+          <AlertTitle>Falha ao carregar o dashboard</AlertTitle>
+          <AlertDescription>
+            {error || "Nao foi possivel obter os dados agora. Verifique o backend e tente novamente."}
+          </AlertDescription>
+        </Alert>
+        <Button onClick={loadData}>Tentar novamente</Button>
       </div>
     );
   }

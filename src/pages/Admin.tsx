@@ -13,10 +13,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Plus, RotateCcw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Admin = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -24,18 +26,34 @@ const Admin = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const data = await listUsers();
-    setUsers(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await listUsers();
+      setUsers(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar usuarios";
+      setError(message);
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResetData = async () => {
-    await resetDemoData();
-    toast({
-      title: "Dados resetados",
-      description: "Os dados de demonstração foram restaurados",
-    });
-    loadData();
+    try {
+      await resetDemoData();
+      toast({
+        title: "Dados resetados",
+        description: "Os dados de demonstração foram restaurados",
+      });
+      loadData();
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: "Reset de dados nao disponivel no backend",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {
@@ -45,6 +63,18 @@ const Admin = () => {
           <div className="h-8 w-64 bg-muted rounded" />
           <div className="h-96 bg-muted rounded-lg" />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 space-y-4">
+        <Alert variant="destructive">
+          <AlertTitle>Falha ao carregar usuarios</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={loadData}>Tentar novamente</Button>
       </div>
     );
   }

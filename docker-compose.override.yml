@@ -1,0 +1,19 @@
+# ============================================================
+# LIQUID FLOW MONITOR - DOCKER COMPOSE OVERRIDE (DEVELOPMENT)
+# Este arquivo e automaticamente mesclado com docker-compose.yml
+# em ambiente de desenvolvimento
+# ============================================================
+
+version: '3.8'
+
+services:
+  backend:
+    build:
+      target: builder
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: npm run dev
+    environment:
+      NODE_ENV: development
+      DEBUG: "app:*"

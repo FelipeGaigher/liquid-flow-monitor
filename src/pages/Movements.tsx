@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Download, Plus } from "lucide-react";
 
 const Movements = () => {
@@ -19,6 +20,7 @@ const Movements = () => {
   const [tanks, setTanks] = useState<Tank[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -26,13 +28,22 @@ const Movements = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const [movData, tanksData] = await Promise.all([
-      listMovements({}, 1, 50),
-      listTanks(),
-    ]);
-    setMovements(movData.data);
-    setTanks(tanksData);
-    setLoading(false);
+    setError(null);
+    try {
+      const [movData, tanksData] = await Promise.all([
+        listMovements({}, 1, 50),
+        listTanks(),
+      ]);
+      setMovements(movData.data);
+      setTanks(tanksData);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar movimentacoes";
+      setError(message);
+      setMovements([]);
+      setTanks([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getTankName = (tankId: string) => {
@@ -82,6 +93,18 @@ const Movements = () => {
           <div className="h-8 w-64 bg-muted rounded" />
           <div className="h-96 bg-muted rounded-lg" />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 space-y-4">
+        <Alert variant="destructive">
+          <AlertTitle>Falha ao carregar as movimentacoes</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={loadData}>Tentar novamente</Button>
       </div>
     );
   }

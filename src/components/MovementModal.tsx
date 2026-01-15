@@ -17,7 +17,7 @@ import {
 } from "./ui/select";
 import { Textarea } from "./ui/textarea";
 import { Movement, MovementType, ProductType, Tank } from "@/types";
-import { createMovement, getCurrentPrice, getTankById } from "@/services/api";
+import { createMovement, getCurrentPrice } from "@/services/api";
 import { toast } from "@/hooks/use-toast";
 import { ArrowRight } from "lucide-react";
 

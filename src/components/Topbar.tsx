@@ -8,7 +8,8 @@ import {
   SelectValue,
 } from "./ui/select";
 import { useFilters } from "@/contexts/FilterContext";
-import { Calendar, Filter } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Calendar, Filter, LogOut } from "lucide-react";
 
 const periodOptions = [
   { value: "hoje", label: "Hoje" },
@@ -22,6 +23,14 @@ const periodOptions = [
 
 export const Topbar = () => {
   const { filters, updateFilters } = useFilters();
+  const { user, logout } = useAuth();
+  const initials =
+    user?.name
+      ?.split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "US";
 
   return (
     <header className="h-16 bg-card border-b border-border px-6 flex items-center justify-between">
@@ -53,8 +62,12 @@ export const Topbar = () => {
 
       <div className="flex items-center gap-3">
         <ThemeToggle />
+        <Button variant="ghost" size="sm" className="gap-2" onClick={logout}>
+          <LogOut className="h-4 w-4" />
+          Sair
+        </Button>
         <div className="h-8 w-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-medium text-primary">
-          JS
+          {initials}
         </div>
       </div>
     </header>

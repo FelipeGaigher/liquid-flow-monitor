@@ -1,19 +1,45 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Droplet } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { login, user } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const from = (location.state as { from?: { pathname?: string } })?.from?.pathname || "/dashboard";
+
+  useEffect(() => {
+    if (user) {
+      navigate(from, { replace: true });
+    }
+  }, [user, from, navigate]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    navigate("/dashboard");
+    setLoading(true);
+    try {
+      await login(email, password);
+      navigate(from, { replace: true });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Nao foi possivel autenticar";
+      toast({
+        title: "Falha no login",
+        description: message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -54,13 +80,9 @@ const Login = () => {
             />
           </div>
 
-          <Button type="submit" className="w-full mt-6">
-            Entrar
+          <Button type="submit" className="w-full mt-6" disabled={loading}>
+            {loading ? "Entrando..." : "Entrar"}
           </Button>
-
-          <p className="text-center text-sm text-muted-foreground mt-4">
-            Modo demonstração • Qualquer credencial funciona
-          </p>
         </form>
       </Card>
     </div>

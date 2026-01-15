@@ -12,10 +12,12 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const ProductsPrices = () => {
   const [priceLists, setPriceLists] = useState<PriceList[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -23,9 +25,17 @@ const ProductsPrices = () => {
 
   const loadData = async () => {
     setLoading(true);
-    const data = await listPriceLists();
-    setPriceLists(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await listPriceLists();
+      setPriceLists(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao carregar precos";
+      setError(message);
+      setPriceLists([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (loading) {
@@ -35,6 +45,18 @@ const ProductsPrices = () => {
           <div className="h-8 w-64 bg-muted rounded" />
           <div className="h-96 bg-muted rounded-lg" />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 space-y-4">
+        <Alert variant="destructive">
+          <AlertTitle>Falha ao carregar produtos e precos</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+        <Button onClick={loadData}>Tentar novamente</Button>
       </div>
     );
   }
