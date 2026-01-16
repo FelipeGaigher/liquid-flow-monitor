@@ -54,16 +54,24 @@ export function buildLowStockEmail(params: {
   siteName?: string;
   currentVolume: number;
   minAlert: number;
+  appUrl?: string;
 }) {
-  const { tankName, productName, siteName, currentVolume, minAlert } = params;
+  const { tankName, productName, siteName, currentVolume, minAlert, appUrl } = params;
   const title = 'Alerta de estoque baixo';
   const location = siteName ? `Site: ${siteName}` : 'Site: Nao informado';
   const product = productName ? `Produto: ${productName}` : 'Produto: Nao informado';
   const message = `O tanque ${tankName} atingiu o nivel minimo de alerta.\n${product}\n${location}\nVolume atual: ${currentVolume} L\nMinimo configurado: ${minAlert} L`;
+  const footer = 'Se voce nao esperava este email, ignore esta mensagem.';
 
   return {
     subject: `Alerta de estoque - ${tankName}`,
-    html: baseTemplate({ title, message: message.replace(/\n/g, '<br />') }),
+    html: baseTemplate({
+      title,
+      message: message.replace(/\n/g, '<br />'),
+      ctaLabel: appUrl ? 'Acessar o sistema' : undefined,
+      ctaUrl: appUrl,
+      footer,
+    }),
     text: `${title}\n\n${message}`,
   };
 }

@@ -101,7 +101,7 @@ class EmailService {
       return;
     }
 
-    const template = buildLowStockEmail(params);
+    const template = buildLowStockEmail({ ...params, appUrl: env.APP_BASE_URL });
     await this.sendEmail({
       to: recipients,
       subject: template.subject,

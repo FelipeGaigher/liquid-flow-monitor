@@ -1,5 +1,6 @@
 import { db } from '../config/database.js';
 import { Tank, TankWithDetails, PaginatedResponse, Pagination } from '../types/index.js';
+import { auditLogsService } from './audit-logs.service.js';
 
 export interface CreateTankDTO {
   name: string;
@@ -8,6 +9,7 @@ export interface CreateTankDTO {
   capacity_l: number;
   current_volume_l?: number;
   min_alert_l?: number;
+  actor_id?: string;
 }
 
 export interface UpdateTankDTO {
@@ -96,17 +98,38 @@ export class TanksService {
       })
       .returning('*');
 
+    if (data.actor_id) {
+      await auditLogsService.create({
+        user_id: data.actor_id,
+        action: 'CREATE',
+        entity: 'tank',
+        entity_id: tank.id,
+        old_values: null,
+        new_values: {
+          name: tank.name,
+          site_id: tank.site_id,
+          product_id: tank.product_id,
+          capacity_l: tank.capacity_l,
+          current_volume_l: tank.current_volume_l,
+          min_alert_l: tank.min_alert_l,
+          status: tank.status,
+        },
+      });
+    }
+
     return tank;
   }
 
-  async update(id: string, data: UpdateTankDTO): Promise<Tank | null> {
+  async update(id: string, data: UpdateTankDTO, actorId?: string): Promise<Tank | null> {
+    const existing = await this.findById(id);
+    if (!existing) {
+      return null;
+    }
+
     if (data.capacity_l !== undefined || data.current_volume_l !== undefined) {
-      const existing = await this.findById(id);
-      if (existing) {
-        const capacity = data.capacity_l ?? existing.capacity_l;
-        const volume = data.current_volume_l ?? existing.current_volume_l;
-        this.validateVolume(volume, capacity);
-      }
+      const capacity = data.capacity_l ?? existing.capacity_l;
+      const volume = data.current_volume_l ?? existing.current_volume_l;
+      this.validateVolume(volume, capacity);
     }
 
     const [tank] = await db<Tank>('tanks')
@@ -116,6 +139,33 @@ export class TanksService {
         updated_at: new Date(),
       })
       .returning('*');
+
+    if (tank && actorId) {
+      await auditLogsService.create({
+        user_id: actorId,
+        action: 'UPDATE',
+        entity: 'tank',
+        entity_id: tank.id,
+        old_values: {
+          name: existing.name,
+          site_id: existing.site_id,
+          product_id: existing.product_id,
+          capacity_l: existing.capacity_l,
+          current_volume_l: existing.current_volume_l,
+          min_alert_l: existing.min_alert_l,
+          status: existing.status,
+        },
+        new_values: {
+          name: tank.name,
+          site_id: tank.site_id,
+          product_id: tank.product_id,
+          capacity_l: tank.capacity_l,
+          current_volume_l: tank.current_volume_l,
+          min_alert_l: tank.min_alert_l,
+          status: tank.status,
+        },
+      });
+    }
 
     return tank || null;
   }

@@ -1,6 +1,7 @@
 import { db } from '../config/database.js';
 import { Movement, MovementWithDetails, MovementType, PaginatedResponse } from '../types/index.js';
 import { tanksService, TankError } from './tanks.service.js';
+import { auditLogsService } from './audit-logs.service.js';
 import { emailService } from './email.service.js';
 import { logger } from '../utils/logger.js';
 
@@ -149,6 +150,27 @@ export class MovementsService {
         });
 
       return newMovement;
+    });
+
+    await auditLogsService.create({
+      user_id: data.operator_id,
+      action: 'CREATE',
+      entity: 'movement',
+      entity_id: movement.id,
+      old_values: null,
+      new_values: {
+        tank_id: movement.tank_id,
+        product_id: movement.product_id,
+        type: movement.type,
+        volume_l: movement.volume_l,
+        price_per_l: movement.price_per_l,
+        cost_per_l: movement.cost_per_l,
+        total_value: movement.total_value,
+        total_cost: movement.total_cost,
+        profit: movement.profit,
+        reference: movement.reference,
+        notes: movement.notes,
+      },
     });
 
     const shouldAlert = updatedVolume <= tank.min_alert_l && tank.current_volume_l > tank.min_alert_l;

@@ -436,14 +436,16 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 
 ### TASK-FEAT-003: Implementar Logs de Auditoria (P2)
 
-- [ ] Criar tabela audit_logs (ja existe no schema)
-- [ ] Implementar registro de acoes (CREATE, UPDATE, DELETE)
-- [ ] Implementar registro de login/logout
-- [ ] Criar endpoint de consulta de logs (admin)
+- [x] Criar tabela audit_logs (ja existe no schema)
+- [~] Implementar registro de acoes (CREATE, UPDATE, DELETE)
+- [x] Implementar registro de login/logout
+- [x] Criar endpoint de consulta de logs (admin)
 - [ ] Testar registros
 
 **Arquivos relacionados:**
 - `docs/03-modelagem-dados/SCHEMA-postgresql.sql`
+
+**Status:** EM PROGRESSO em Janeiro 2026
 
 ---
 
@@ -496,13 +498,15 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 
 ### TASK-TEST-002: Implementar Testes de Integracao (P1)
 
-- [ ] Configurar ambiente de testes
-- [ ] Criar testes para fluxo de autenticacao
-- [ ] Criar testes para fluxo de movimentacoes
-- [ ] Criar testes para validacoes de negocio
+- [x] Configurar ambiente de testes
+- [x] Criar testes para fluxo de autenticacao
+- [x] Criar testes para fluxo de movimentacoes
+- [x] Criar testes para validacoes de negocio
 
 **Arquivos relacionados:**
 - `docs/07-plano-testes/TC-001-movimentacoes.md`
+
+**Status:** CONCLUIDO
 
 ---
 

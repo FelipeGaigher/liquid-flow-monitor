@@ -7,6 +7,7 @@ import { User, UserPublic, AuthTokens, JWTPayload } from '../types/index.js';
 import { Role } from '../config/permissions.js';
 import { emailService } from './email.service.js';
 import { logger } from '../utils/logger.js';
+import { auditLogsService } from './audit-logs.service.js';
 
 export class AuthService {
   private readonly SALT_ROUNDS = 10;
@@ -28,6 +29,18 @@ export class AuthService {
 
     const tokens = this.generateTokens(user);
     const userPublic = this.toPublicUser(user);
+
+    await auditLogsService.create({
+      user_id: user.id,
+      action: 'LOGIN',
+      entity: 'user',
+      entity_id: user.id,
+      old_values: null,
+      new_values: {
+        email: user.email,
+        role: user.role,
+      },
+    });
 
     return { tokens, user: userPublic };
   }
@@ -88,6 +101,17 @@ export class AuthService {
     await db('users')
       .where({ id: userId })
       .update({ password_hash: newPasswordHash, updated_at: new Date() });
+  }
+
+  async logout(userId: string): Promise<void> {
+    await auditLogsService.create({
+      user_id: userId,
+      action: 'LOGOUT',
+      entity: 'user',
+      entity_id: userId,
+      old_values: null,
+      new_values: null,
+    });
   }
 
   async requestPasswordReset(email: string): Promise<void> {

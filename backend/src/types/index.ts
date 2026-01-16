@@ -148,3 +148,17 @@ export interface PasswordResetToken {
   used: boolean;
   created_at: Date;
 }
+
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'LOGOUT';
+
+export interface AuditLog {
+  id: string;
+  user_id?: string | null;
+  action: AuditAction;
+  entity: string;
+  entity_id?: string | null;
+  old_values?: Record<string, unknown> | null;
+  new_values?: Record<string, unknown> | null;
+  ip_address?: string | null;
+  created_at: Date;
+}

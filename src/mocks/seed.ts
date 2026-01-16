@@ -73,7 +73,7 @@ export const mockTanks: Tank[] = [
 
 // Users
 export const mockUsers: User[] = [
-  { id: "user-1", name: "João Silva", email: "joao@example.com", phone: "(11) 98765-4321", role: "admin", status: "active" },
+  { id: "user-1", name: "Administrador", email: "admin@tankcontrol.com", phone: "(11) 98765-4321", role: "admin", status: "active" },
   { id: "user-2", name: "Maria Santos", email: "maria@example.com", phone: "(21) 99876-5432", role: "operador", status: "active" },
   { id: "user-3", name: "Pedro Costa", email: "pedro@example.com", phone: "(31) 97654-3210", role: "operador", status: "active" },
   { id: "user-4", name: "Ana Paula", email: "ana@example.com", role: "viewer", status: "active" },
