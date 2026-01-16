@@ -512,11 +512,11 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 
 ### TASK-TEST-003: Implementar Testes E2E no Frontend (P2)
 
-- [ ] Configurar Playwright ou Cypress
-- [ ] Criar testes para fluxo de login
-- [ ] Criar testes para fluxo de movimentacoes
-- [ ] Criar testes para dashboard
-- [ ] Criar testes para exportacao
+- [x] Configurar Playwright ou Cypress
+- [x] Criar testes para fluxo de login
+- [x] Criar testes para fluxo de movimentacoes
+- [x] Criar testes para dashboard
+- [x] Criar testes para exportacao
 
 ---
 

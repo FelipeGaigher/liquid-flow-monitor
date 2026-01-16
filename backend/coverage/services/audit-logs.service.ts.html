@@ -23,30 +23,30 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">4.54% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>1/22</span>
+                <span class='fraction'>22/22</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">84.21% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/19</span>
+                <span class='fraction'>16/19</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">0% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Functions</span>
-                <span class='fraction'>0/2</span>
+                <span class='fraction'>2/2</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">6.25% </span>
+                <span class="strong">100% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>1/16</span>
+                <span class='fraction'>16/16</span>
             </div>
         
             
@@ -61,7 +61,7 @@
             </div>
         </template>
     </div>
-    <div class='status-line low'></div>
+    <div class='status-line high'></div>
     <pre><table class="coverage">
 <tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
 <a name='L2'></a><a href='#L2'>2</a>
@@ -165,7 +165,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -179,7 +179,7 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -187,28 +187,26 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
@@ -218,7 +216,9 @@
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
 <span class="cline-any cline-neutral">&nbsp;</span>
-<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">6x</span>
 <span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">import { db } from '../config/database.js';
 import { AuditAction, AuditLog, PaginatedResponse } from '../types/index.js';
 &nbsp;
@@ -242,8 +242,8 @@ export interface AuditLogFilters {
 }
 &nbsp;
 class AuditLogsService {
-<span class="fstat-no" title="function not covered" >  async </span>create(payload: CreateAuditLogDTO): Promise&lt;AuditLog&gt; {
-    const [log] = <span class="cstat-no" title="statement not covered" >await db&lt;AuditLog&gt;('audit_logs')</span>
+  async create(payload: CreateAuditLogDTO): Promise&lt;AuditLog&gt; {
+    const [log] = await db&lt;AuditLog&gt;('audit_logs')
       .insert({
         id: crypto.randomUUID(),
         user_id: payload.user_id ?? null,
@@ -257,34 +257,34 @@ class AuditLogsService {
       })
       .returning('*');
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return log;</span>
+    return log;
   }
 &nbsp;
-<span class="fstat-no" title="function not covered" >  async </span>findAll(
+  async findAll(
     filters: AuditLogFilters = <span class="branch-0 cbranch-no" title="branch not covered" >{},</span>
     page: number = <span class="branch-0 cbranch-no" title="branch not covered" >1,</span>
     limit: number = <span class="branch-0 cbranch-no" title="branch not covered" >20</span>
   ): Promise&lt;PaginatedResponse&lt;AuditLog&gt;&gt; {
-    let query = <span class="cstat-no" title="statement not covered" >db&lt;AuditLog&gt;('audit_logs').select('*');</span>
+    let query = db&lt;AuditLog&gt;('audit_logs').select('*');
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (filters.user_id) <span class="cstat-no" title="statement not covered" >query = query.where('user_id', filters.user_id);</span></span>
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (filters.action) <span class="cstat-no" title="statement not covered" >query = query.where('action', filters.action);</span></span>
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (filters.entity) <span class="cstat-no" title="statement not covered" >query = query.where('entity', filters.entity);</span></span>
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (filters.entity_id) <span class="cstat-no" title="statement not covered" >query = query.where('entity_id', filters.entity_id);</span></span>
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (filters.start_date) <span class="cstat-no" title="statement not covered" >query = query.where('created_at', '&gt;=', filters.start_date);</span></span>
-<span class="cstat-no" title="statement not covered" >    <span class="missing-if-branch" title="if path not taken" >I</span>if (filters.end_date) <span class="cstat-no" title="statement not covered" >query = query.where('created_at', '&lt;=', filters.end_date);</span></span>
+    if (filters.user_id) query = query.where('user_id', filters.user_id);
+    if (filters.action) query = query.where('action', filters.action);
+    if (filters.entity) query = query.where('entity', filters.entity);
+    if (filters.entity_id) query = query.where('entity_id', filters.entity_id);
+    if (filters.start_date) query = query.where('created_at', '&gt;=', filters.start_date);
+    if (filters.end_date) query = query.where('created_at', '&lt;=', filters.end_date);
 &nbsp;
-    const countQuery = <span class="cstat-no" title="statement not covered" >query.clone();</span>
-    const [{ count }] = <span class="cstat-no" title="statement not covered" >await countQuery.count('id as count');</span>
-    const total = <span class="cstat-no" title="statement not covered" >Number(count);</span>
+    const countQuery = query.clone();
+    const [{ count }] = await countQuery.count('id as count');
+    const total = Number(count);
 &nbsp;
-    const offset = <span class="cstat-no" title="statement not covered" >(page - 1) * limit;</span>
-    const data = <span class="cstat-no" title="statement not covered" >await query</span>
+    const offset = (page - 1) * limit;
+    const data = await query
       .orderBy('created_at', 'desc')
       .limit(limit)
       .offset(offset);
 &nbsp;
-<span class="cstat-no" title="statement not covered" >    return {</span>
+    return {
       data: data as AuditLog[],
       pagination: {
         page,
@@ -304,7 +304,7 @@ export const auditLogsService = new AuditLogsService();
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2026-01-16T13:38:59.328Z
+                at 2026-01-16T13:46:14.601Z
             </div>
         <script src="../prettify.js"></script>
         <script>

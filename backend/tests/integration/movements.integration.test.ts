@@ -24,6 +24,10 @@ const { MovementsService } = await import('../../src/services/movements.service.
 
 describe('MovementsService integration', () => {
   let movementsService: InstanceType<typeof MovementsService>;
+  const userId = '11111111-1111-1111-1111-111111111111';
+  const siteId = '22222222-2222-2222-2222-222222222222';
+  const productId = '33333333-3333-3333-3333-333333333333';
+  const tankId = '44444444-4444-4444-4444-444444444444';
 
   beforeAll(async () => {
     await setupSchema(testDb.db);
@@ -38,7 +42,7 @@ describe('MovementsService integration', () => {
     emailServiceMock.sendLowStockAlert.mockReset();
 
     await testDb.db('users').insert({
-      id: 'user-1',
+      id: userId,
       email: 'operator@test.com',
       password_hash: 'hash',
       name: 'Operador',
@@ -49,7 +53,7 @@ describe('MovementsService integration', () => {
     });
 
     await testDb.db('sites').insert({
-      id: 'site-1',
+      id: siteId,
       name: 'Site Teste',
       status: 'active',
       created_at: new Date(),
@@ -57,7 +61,7 @@ describe('MovementsService integration', () => {
     });
 
     await testDb.db('products').insert({
-      id: 'prod-1',
+      id: productId,
       name: 'Produto A',
       status: 'active',
       created_at: new Date(),
@@ -65,10 +69,10 @@ describe('MovementsService integration', () => {
     });
 
     await testDb.db('tanks').insert({
-      id: 'tank-1',
+      id: tankId,
       name: 'Tanque 01',
-      site_id: 'site-1',
-      product_id: 'prod-1',
+      site_id: siteId,
+      product_id: productId,
       capacity_l: 10000,
       current_volume_l: 5000,
       min_alert_l: 1000,
@@ -82,17 +86,17 @@ describe('MovementsService integration', () => {
 
   it('creates entrada movement and updates tank volume', async () => {
     const movement = await movementsService.create({
-      tank_id: 'tank-1',
+      tank_id: tankId,
       type: 'entrada',
       volume_l: 1000,
       cost_per_l: 2.0,
-      operator_id: 'user-1',
+      operator_id: userId,
     });
 
     expect(movement.id).toBeTruthy();
     expect(movement.type).toBe('entrada');
 
-    const updatedTank = await testDb.db('tanks').where({ id: 'tank-1' }).first();
+    const updatedTank = await testDb.db('tanks').where({ id: tankId }).first();
     expect(Number(updatedTank.current_volume_l)).toBe(6000);
 
     const logs = await testDb.db('audit_logs').select('*');
@@ -103,15 +107,15 @@ describe('MovementsService integration', () => {
 
   it('sends low stock alert when volume crosses min alert', async () => {
     await testDb.db('tanks')
-      .where({ id: 'tank-1' })
+      .where({ id: tankId })
       .update({ current_volume_l: 1500, min_alert_l: 1000 });
 
     await movementsService.create({
-      tank_id: 'tank-1',
+      tank_id: tankId,
       type: 'saida',
       volume_l: 600,
       price_per_l: 5.0,
-      operator_id: 'user-1',
+      operator_id: userId,
     });
 
     expect(emailServiceMock.sendLowStockAlert).toHaveBeenCalledTimes(1);
@@ -122,10 +126,10 @@ describe('MovementsService integration', () => {
 
   it('blocks saida without price and does not create movement', async () => {
     await expect(movementsService.create({
-      tank_id: 'tank-1',
+      tank_id: tankId,
       type: 'saida',
       volume_l: 100,
-      operator_id: 'user-1',
+      operator_id: userId,
     })).rejects.toThrow('Preco por litro e obrigatorio para saidas');
 
     const movements = await testDb.db('movements').select('*');

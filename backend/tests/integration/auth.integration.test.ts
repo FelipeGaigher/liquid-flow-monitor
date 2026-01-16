@@ -25,6 +25,9 @@ const { AuthService } = await import('../../src/services/auth.service.js');
 
 describe('AuthService integration', () => {
   let authService: InstanceType<typeof AuthService>;
+  const userId = '11111111-1111-1111-1111-111111111111';
+  const oldTokenId = '22222222-2222-2222-2222-222222222222';
+  const resetTokenId = '33333333-3333-3333-3333-333333333333';
 
   beforeAll(async () => {
     await setupSchema(testDb.db);
@@ -40,7 +43,7 @@ describe('AuthService integration', () => {
 
     const passwordHash = await bcrypt.hash('password123', 10);
     await testDb.db('users').insert({
-      id: 'user-1',
+      id: userId,
       email: 'user@test.com',
       password_hash: passwordHash,
       name: 'Test User',
@@ -64,13 +67,13 @@ describe('AuthService integration', () => {
     expect(logs).toHaveLength(1);
     expect(logs[0].action).toBe('LOGIN');
     expect(logs[0].entity).toBe('user');
-    expect(logs[0].user_id).toBe('user-1');
+    expect(logs[0].user_id).toBe(userId);
   });
 
   it('creates password reset token and invalidates previous ones', async () => {
     await testDb.db('password_reset_tokens').insert({
-      id: 'token-old',
-      user_id: 'user-1',
+      id: oldTokenId,
+      user_id: userId,
       token: 'old-token',
       expires_at: new Date(Date.now() + 60 * 60 * 1000),
       used: false,
@@ -82,7 +85,7 @@ describe('AuthService integration', () => {
     expect(emailServiceMock.sendPasswordResetEmail).toHaveBeenCalledTimes(1);
 
     const tokens = await testDb.db('password_reset_tokens')
-      .where({ user_id: 'user-1' })
+      .where({ user_id: userId })
       .orderBy('created_at', 'asc');
 
     expect(tokens).toHaveLength(2);
@@ -94,8 +97,8 @@ describe('AuthService integration', () => {
 
   it('confirms password reset and updates user password', async () => {
     await testDb.db('password_reset_tokens').insert({
-      id: 'token-reset',
-      user_id: 'user-1',
+      id: resetTokenId,
+      user_id: userId,
       token: 'reset-token',
       expires_at: new Date(Date.now() + 60 * 60 * 1000),
       used: false,
@@ -104,12 +107,12 @@ describe('AuthService integration', () => {
 
     await authService.confirmPasswordReset('reset-token', 'newPassword123');
 
-    const user = await testDb.db('users').where({ id: 'user-1' }).first();
+    const user = await testDb.db('users').where({ id: userId }).first();
     expect(user).toBeTruthy();
     const matches = await bcrypt.compare('newPassword123', user.password_hash);
     expect(matches).toBe(true);
 
-    const token = await testDb.db('password_reset_tokens').where({ id: 'token-reset' }).first();
+    const token = await testDb.db('password_reset_tokens').where({ id: resetTokenId }).first();
     expect(token.used).toBe(true);
   });
 });
