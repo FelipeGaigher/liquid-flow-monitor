@@ -520,12 +520,27 @@ function filterMovementsForList(
   const product = filters.products?.[0];
   const type = filters.movementTypes?.[0];
   const operatorId = filters.operatorIds?.[0];
+  const periodRange = filters.period
+    ? resolvePeriod({
+        period: filters.period,
+        customDateRange: filters.customDateRange,
+        products: [],
+        tankIds: [],
+        siteIds: [],
+        operatorIds: [],
+        movementTypes: [],
+      })
+    : null;
 
   return movements.filter((movement) => {
     if (tankId && movement.tank_id !== tankId) return false;
     if (product && movement.product !== product) return false;
     if (type && movement.type !== type) return false;
     if (operatorId && movement.operator_id !== operatorId) return false;
+    if (periodRange) {
+      const createdAt = new Date(movement.created_at);
+      if (createdAt < periodRange.start || createdAt > periodRange.end) return false;
+    }
     return true;
   });
 }
@@ -645,11 +660,25 @@ export async function listMovements(
   page = 1,
   pageSize = 20
 ) {
+  const periodRange = filters.period
+    ? resolvePeriod({
+        period: filters.period,
+        customDateRange: filters.customDateRange,
+        products: [],
+        tankIds: [],
+        siteIds: [],
+        operatorIds: [],
+        movementTypes: [],
+      })
+    : null;
+
   const query = buildQuery({
     tank_id: filters.tankIds?.[0],
     product: filters.products?.[0] ? toApiProduct(filters.products[0]) : undefined,
     type: filters.movementTypes?.[0] ? toApiMovementType(filters.movementTypes[0]) : undefined,
     operator_id: filters.operatorIds?.[0],
+    start_date: periodRange?.start ? periodRange.start.toISOString() : undefined,
+    end_date: periodRange?.end ? periodRange.end.toISOString() : undefined,
     page,
     limit: pageSize,
   });

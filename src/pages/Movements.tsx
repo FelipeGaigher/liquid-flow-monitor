@@ -14,8 +14,10 @@ import {
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Download, Plus } from "lucide-react";
+import { useFilters } from "@/contexts/FilterContext";
 
 const Movements = () => {
+  const { filters } = useFilters();
   const [movements, setMovements] = useState<Movement[]>([]);
   const [tanks, setTanks] = useState<Tank[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,16 +26,13 @@ const Movements = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [filters]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [movData, tanksData] = await Promise.all([
-        listMovements({}, 1, 50),
-        listTanks(),
-      ]);
+      const [movData, tanksData] = await Promise.all([listMovements(filters, 1, 50), listTanks()]);
       setMovements(movData.data);
       setTanks(tanksData);
     } catch (err) {
@@ -135,8 +134,9 @@ const Movements = () => {
         </div>
       </div>
 
-      <Card>
-        <Table>
+      <Card className="flex max-h-[70vh] flex-col overflow-hidden">
+        <div className="flex-1 overflow-auto">
+          <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Data/Hora</TableHead>
@@ -211,7 +211,8 @@ const Movements = () => {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
 
         <div className="border-t p-4 bg-muted/30">
           <div className="flex gap-8 text-sm font-medium">

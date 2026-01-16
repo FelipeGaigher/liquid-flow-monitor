@@ -5,6 +5,8 @@ import { db } from '../config/database.js';
 import { env } from '../config/env.js';
 import { User, UserPublic, AuthTokens, JWTPayload } from '../types/index.js';
 import { Role } from '../config/permissions.js';
+import { emailService } from './email.service.js';
+import { logger } from '../utils/logger.js';
 
 export class AuthService {
   private readonly SALT_ROUNDS = 10;
@@ -117,8 +119,16 @@ export class AuthService {
       created_at: new Date(),
     });
 
-    // Em producao, enviar email. Aqui apenas logamos.
-    console.log(`[Mock Email] Password reset token for ${email}: ${token}`);
+    try {
+      await emailService.sendPasswordResetEmail({
+        name: user.name,
+        email: user.email,
+        token,
+        expiresHours: this.RESET_TOKEN_EXPIRY_HOURS,
+      });
+    } catch (error) {
+      logger.error('Failed to send password reset email', { error });
+    }
   }
 
   async confirmPasswordReset(token: string, newPassword: string): Promise<void> {

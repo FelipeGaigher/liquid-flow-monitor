@@ -15,7 +15,7 @@ export const FilterProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     tankIds: [],
     siteIds: [],
     operatorIds: [],
-    movementTypes: ["saída"],
+    movementTypes: [],
   });
 
   const updateFilters = (updates: Partial<DashboardFilters>) => {

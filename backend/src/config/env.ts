@@ -24,6 +24,14 @@ export const env = {
 
   // Logging
   LOG_LEVEL: process.env.LOG_LEVEL || 'info',
+
+  // Email
+  EMAIL_PROVIDER: process.env.EMAIL_PROVIDER || 'console',
+  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY || '',
+  EMAIL_FROM: process.env.EMAIL_FROM || 'no-reply@tankcontrol.local',
+  EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME || 'TankControl',
+  EMAIL_ALERT_RECIPIENTS: process.env.EMAIL_ALERT_RECIPIENTS || '',
+  APP_BASE_URL: process.env.APP_BASE_URL || 'http://localhost:5173',
 };
 
 export function validateEnv(): void {
@@ -33,6 +41,15 @@ export function validateEnv(): void {
     for (const key of required) {
       if (!process.env[key]) {
         throw new Error(`Missing required environment variable: ${key}`);
+      }
+    }
+
+    if (env.EMAIL_PROVIDER === 'sendgrid') {
+      const emailRequired = ['SENDGRID_API_KEY', 'EMAIL_FROM'];
+      for (const key of emailRequired) {
+        if (!process.env[key]) {
+          throw new Error(`Missing required environment variable: ${key}`);
+        }
       }
     }
   }

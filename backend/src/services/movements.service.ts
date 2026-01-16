@@ -1,6 +1,8 @@
 import { db } from '../config/database.js';
 import { Movement, MovementWithDetails, MovementType, PaginatedResponse } from '../types/index.js';
 import { tanksService, TankError } from './tanks.service.js';
+import { emailService } from './email.service.js';
+import { logger } from '../utils/logger.js';
 
 export interface CreateMovementDTO {
   tank_id: string;
@@ -113,6 +115,9 @@ export class MovementsService {
     const calculations = this.calculateValues(data);
 
     // Create movement in transaction
+    const volumeChange = this.calculateVolumeChange(data.type, data.volume_l, tank.current_volume_l);
+    const updatedVolume = tank.current_volume_l + volumeChange;
+
     const movement = await db.transaction(async (trx) => {
       // Insert movement
       const [newMovement] = await trx<Movement>('movements')
@@ -145,6 +150,21 @@ export class MovementsService {
 
       return newMovement;
     });
+
+    const shouldAlert = updatedVolume <= tank.min_alert_l && tank.current_volume_l > tank.min_alert_l;
+    if (shouldAlert) {
+      try {
+        await emailService.sendLowStockAlert({
+          tankName: tank.name,
+          productName: tank.product_name,
+          siteName: tank.site_name,
+          currentVolume: updatedVolume,
+          minAlert: tank.min_alert_l,
+        });
+      } catch (error) {
+        logger.error('Failed to send low stock alert', { error, tankId: tank.id });
+      }
+    }
 
     return movement;
   }
