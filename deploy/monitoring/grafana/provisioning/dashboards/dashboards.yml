@@ -1,0 +1,18 @@
+# ============================================================
+# GRAFANA DASHBOARDS PROVISIONING
+# Liquid Flow Monitor
+# ============================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'Liquid Flow Monitor'
+    orgId: 1
+    folder: 'LFM'
+    folderUid: 'lfm'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

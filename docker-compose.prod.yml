@@ -1,0 +1,205 @@
+# ============================================================
+# LIQUID FLOW MONITOR - DOCKER COMPOSE PRODUCTION
+# Versao: 1.0
+# Servicos: Nginx, Backend API, PostgreSQL
+# ============================================================
+#
+# USO:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# PRE-REQUISITOS:
+#   1. Criar arquivo .env.production com as variaveis
+#   2. Gerar certificados SSL em deploy/nginx/ssl/
+#   3. Build da imagem: docker-compose -f docker-compose.prod.yml build
+#
+# ============================================================
+
+version: '3.8'
+
+services:
+  # ==========================================================
+  # NGINX - Reverse Proxy + SSL + Static Files
+  # ==========================================================
+  nginx:
+    image: nginx:alpine
+    container_name: lfm-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/sites:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/ssl:/etc/nginx/ssl:ro
+      - ./dist:/usr/share/nginx/html:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - lfm-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================
+  # BACKEND - Node.js API
+  # ==========================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+    image: lfm-backend:${VERSION:-latest}
+    container_name: lfm-backend
+    restart: always
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      DB_SSL: ${DB_SSL:-true}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-console}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      APP_BASE_URL: ${APP_BASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - lfm-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ==========================================================
+  # DATABASE - PostgreSQL
+  # ==========================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: lfm-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - postgres_backups:/backups
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - lfm-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ==========================================================
+  # BACKUP - Scheduled PostgreSQL Backups
+  # ==========================================================
+  backup:
+    image: postgres:16-alpine
+    container_name: lfm-backup
+    restart: always
+    environment:
+      PGHOST: postgres
+      PGUSER: ${DB_USER}
+      PGPASSWORD: ${DB_PASSWORD}
+      PGDATABASE: ${DB_NAME}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+    volumes:
+      - postgres_backups:/backups
+      - ./deploy/scripts/backup-db.sh:/backup.sh:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Backup service started"
+        # Run backup every day at 2 AM
+        while true; do
+          current_hour=$$(date +%H)
+          if [ "$$current_hour" = "02" ]; then
+            echo "Starting backup at $$(date)"
+            /backup.sh
+            sleep 3600  # Sleep 1 hour to avoid multiple runs
+          fi
+          sleep 1800  # Check every 30 minutes
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - lfm-network
+    profiles:
+      - backup
+
+# ==========================================================
+# VOLUMES
+# ==========================================================
+volumes:
+  postgres_data:
+    driver: local
+  postgres_backups:
+    driver: local
+  nginx_logs:
+    driver: local
+
+# ==========================================================
+# NETWORKS
+# ==========================================================
+networks:
+  lfm-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

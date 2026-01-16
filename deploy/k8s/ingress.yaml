@@ -1,0 +1,102 @@
+# ============================================================
+# LIQUID FLOW MONITOR - KUBERNETES INGRESS
+# ============================================================
+#
+# PRE-REQUISITOS:
+#   - NGINX Ingress Controller instalado
+#   - Cert-Manager para SSL (opcional)
+#
+# INSTALACAO DO INGRESS CONTROLLER:
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+#
+# ============================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lfm-ingress
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "10"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    # Security headers
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      add_header X-Frame-Options "SAMEORIGIN" always;
+      add_header X-Content-Type-Options "nosniff" always;
+      add_header X-XSS-Protection "1; mode=block" always;
+      add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # Cert-Manager (descomente para SSL automatico)
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  # TLS Configuration
+  tls:
+    - hosts:
+        - YOUR_DOMAIN  # [ALTERAR] seu dominio
+      secretName: lfm-tls-secret
+  rules:
+    - host: YOUR_DOMAIN  # [ALTERAR] seu dominio
+      http:
+        paths:
+          # API routes -> Backend
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: lfm-backend-service
+                port:
+                  number: 3000
+          # Health check -> Backend
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: lfm-backend-service
+                port:
+                  number: 3000
+          # Everything else -> Frontend
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lfm-frontend-service
+                port:
+                  number: 80
+
+---
+# Ingress for Login rate limiting
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lfm-ingress-login
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Stricter rate limiting for login
+    nginx.ingress.kubernetes.io/limit-rps: "1"
+    nginx.ingress.kubernetes.io/limit-connections: "5"
+spec:
+  tls:
+    - hosts:
+        - YOUR_DOMAIN
+      secretName: lfm-tls-secret
+  rules:
+    - host: YOUR_DOMAIN
+      http:
+        paths:
+          - path: /api/auth/login
+            pathType: Exact
+            backend:
+              service:
+                name: lfm-backend-service
+                port:
+                  number: 3000

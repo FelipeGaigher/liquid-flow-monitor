@@ -1,0 +1,66 @@
+# ============================================================
+# LIQUID FLOW MONITOR - KUBERNETES SERVICES
+# ============================================================
+
+---
+# Backend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: lfm-backend-service
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    component: backend
+spec:
+  type: ClusterIP
+  selector:
+    app: liquid-flow-monitor
+    component: backend
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000
+      protocol: TCP
+
+---
+# Frontend Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: lfm-frontend-service
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    component: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: liquid-flow-monitor
+    component: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
+      protocol: TCP
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    component: database
+spec:
+  type: ClusterIP
+  selector:
+    app: liquid-flow-monitor
+    component: database
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP

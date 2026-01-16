@@ -1,0 +1,145 @@
+# ============================================================
+# ALERTMANAGER CONFIGURATION
+# Liquid Flow Monitor
+# ============================================================
+
+global:
+  # Tempo para resolver um alerta se nao receber mais dados
+  resolve_timeout: 5m
+
+  # SMTP configuration (para email)
+  # smtp_smarthost: 'smtp.gmail.com:587'
+  # smtp_from: 'alertmanager@example.com'
+  # smtp_auth_username: 'your-email@gmail.com'
+  # smtp_auth_password: 'your-app-password'
+
+  # Slack configuration
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+# Templates personalizados
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Rota principal
+route:
+  # Agrupar alertas pelo mesmo nome
+  group_by: ['alertname', 'severity', 'team']
+
+  # Tempo para esperar antes de enviar o primeiro alerta de um grupo
+  group_wait: 30s
+
+  # Tempo para esperar antes de enviar alertas adicionais do mesmo grupo
+  group_interval: 5m
+
+  # Tempo para re-enviar um alerta que continua ativo
+  repeat_interval: 4h
+
+  # Receiver padrao
+  receiver: 'default-receiver'
+
+  # Rotas especificas por severidade/team
+  routes:
+    # Alertas criticos vao para o canal de emergencia
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true
+
+    # Alertas do time de DBA
+    - match:
+        team: dba
+      receiver: 'dba-receiver'
+      continue: true
+
+    # Alertas do time de DevOps
+    - match:
+        team: devops
+      receiver: 'devops-receiver'
+      continue: true
+
+    # Alertas do time de Backend
+    - match:
+        team: backend
+      receiver: 'backend-receiver'
+      continue: true
+
+# Inibicoes - evitar alertas redundantes
+inhibit_rules:
+  # Se o servico esta down, nao enviar alertas de performance
+  - source_match:
+      alertname: 'HealthCheckFailure'
+    target_match_re:
+      alertname: '(HighErrorRate|SlowResponseTime)'
+    equal: ['service']
+
+  # Se o host esta down, nao enviar alertas de containers
+  - source_match:
+      alertname: 'NodeDown'
+    target_match_re:
+      alertname: 'Container.*'
+    equal: ['instance']
+
+  # Se o banco esta down, nao enviar alertas de conexoes
+  - source_match:
+      alertname: 'PostgreSQLDown'
+    target_match_re:
+      alertname: 'PostgreSQL.*'
+    equal: ['instance']
+
+# Receivers - destinos dos alertas
+receivers:
+  # Receiver padrao (log apenas)
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook'
+        send_resolved: true
+
+  # Receiver para alertas criticos
+  - name: 'critical-receiver'
+    # Email
+    # email_configs:
+    #   - to: 'oncall@example.com'
+    #     send_resolved: true
+    #     headers:
+    #       Subject: '[CRITICAL] {{ .GroupLabels.alertname }}'
+
+    # Slack
+    # slack_configs:
+    #   - channel: '#alerts-critical'
+    #     send_resolved: true
+    #     title: '{{ .Status | toUpper }}: {{ .GroupLabels.alertname }}'
+    #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+    # Webhook (pode ser PagerDuty, OpsGenie, etc)
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/critical'
+        send_resolved: true
+
+  # Receiver para time de DBA
+  - name: 'dba-receiver'
+    # email_configs:
+    #   - to: 'dba-team@example.com'
+    #     send_resolved: true
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/dba'
+        send_resolved: true
+
+  # Receiver para time de DevOps
+  - name: 'devops-receiver'
+    # slack_configs:
+    #   - channel: '#devops-alerts'
+    #     send_resolved: true
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/devops'
+        send_resolved: true
+
+  # Receiver para time de Backend
+  - name: 'backend-receiver'
+    # slack_configs:
+    #   - channel: '#backend-alerts'
+    #     send_resolved: true
+    webhook_configs:
+      - url: 'http://localhost:5001/webhook/backend'
+        send_resolved: true

@@ -1,0 +1,23 @@
+# ============================================================
+# LIQUID FLOW MONITOR - KUBERNETES CONFIGMAP
+# ============================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lfm-config
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  DB_HOST: "postgres-service"
+  DB_PORT: "5432"
+  DB_NAME: "liquid_flow_monitor"
+  DB_SSL: "true"
+  JWT_EXPIRES_IN: "1h"
+  JWT_REFRESH_EXPIRES_IN: "7d"
+  LOG_LEVEL: "info"
+  LOG_FORMAT: "json"
+  RATE_LIMIT_WINDOW_MS: "900000"
+  RATE_LIMIT_MAX_REQUESTS: "100"

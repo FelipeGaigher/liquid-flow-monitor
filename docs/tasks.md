@@ -524,54 +524,126 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 
 ### TASK-OPS-001: Configurar CI/CD (P1)
 
-- [ ] Configurar pipeline de build (GitHub Actions/GitLab CI)
-- [ ] Configurar execucao de testes automaticos
-- [ ] Configurar lint automatico
-- [ ] Configurar deploy automatico para staging
-- [ ] Configurar deploy manual para producao
+- [x] Configurar pipeline de build (GitHub Actions/GitLab CI)
+- [x] Configurar execucao de testes automaticos
+- [x] Configurar lint automatico
+- [x] Configurar deploy automatico para staging
+- [x] Configurar deploy manual para producao
 
 **Arquivos relacionados:**
 - `docs/08-operacoes/RB-001-deploy-producao.md`
+
+**Arquivos criados:**
+- `.github/workflows/ci.yml` - Pipeline de CI (build, test, lint)
+- `.github/workflows/deploy-staging.yml` - Deploy automatico para staging
+- `.github/workflows/deploy-production.yml` - Deploy manual para producao
+- `Dockerfile` - Imagem Docker full-stack (frontend + backend)
+- `.dockerignore` - Exclusoes para build Docker
+
+**Funcionalidades implementadas:**
+- CI: Build e testes do backend com PostgreSQL
+- CI: Build e lint do frontend com Vite/React
+- CI: Testes E2E com Playwright em PRs para main
+- Staging: Deploy automatico em push para develop
+- Producao: Deploy manual com aprovacao ou por tags v*
+- Docker: Imagem multi-stage com nginx + node
+
+**Status:** CONCLUIDO em Janeiro 2026
 
 ---
 
 ### TASK-OPS-002: Configurar Ambiente de Producao (P1)
 
-- [ ] Provisionar servidor/container para backend
-- [ ] Provisionar banco de dados PostgreSQL
-- [ ] Configurar CDN para frontend
-- [ ] Configurar SSL/HTTPS
-- [ ] Configurar variaveis de ambiente
-- [ ] Configurar backups automaticos
+- [x] Provisionar servidor/container para backend
+- [x] Provisionar banco de dados PostgreSQL
+- [x] Configurar CDN para frontend
+- [x] Configurar SSL/HTTPS
+- [x] Configurar variaveis de ambiente
+- [x] Configurar backups automaticos
 
 **Arquivos relacionados:**
 - `docs/04-arquitetura-sistema/C4-CONTAINER.md`
+
+**Arquivos criados:**
+- `docker-compose.prod.yml` - Docker Compose para producao
+- `.env.production.example` - Template de variaveis de ambiente
+- `deploy/nginx/nginx.conf` - Configuracao principal do Nginx
+- `deploy/nginx/sites/default.conf` - Configuracao do site com SSL
+- `deploy/scripts/backup-db.sh` - Script de backup do PostgreSQL
+- `deploy/scripts/restore-db.sh` - Script de restore do PostgreSQL
+- `deploy/scripts/health-check.sh` - Script de health check
+- `deploy/k8s/*.yaml` - Manifests Kubernetes (namespace, deployment, service, ingress)
+- `deploy/README.md` - Documentacao completa de deploy
+
+**Funcionalidades implementadas:**
+- Docker Compose producao com Nginx, Backend, PostgreSQL
+- Nginx reverse proxy com SSL/TLS 1.2-1.3 e security headers
+- Rate limiting por IP e endpoint de login
+- Scripts de backup automatico com rotacao (30 dias)
+- Health check para todos os servicos
+- Manifests Kubernetes completos (opcional)
+
+**Status:** CONCLUIDO em Janeiro 2026
 
 ---
 
 ### TASK-OPS-003: Configurar Monitoramento (P2)
 
-- [ ] Configurar logs centralizados
-- [ ] Configurar metricas de aplicacao
-- [ ] Configurar alertas
-- [ ] Criar dashboards de monitoramento
+- [x] Configurar logs centralizados
+- [x] Configurar metricas de aplicacao
+- [x] Configurar alertas
+- [x] Criar dashboards de monitoramento
 
 **Arquivos relacionados:**
 - `docs/08-operacoes/RB-002-monitoramento-alertas.md`
+
+**Arquivos criados:**
+- `deploy/monitoring/docker-compose.monitoring.yml` - Stack completa de monitoramento
+- `deploy/monitoring/prometheus/prometheus.yml` - Configuracao do Prometheus
+- `deploy/monitoring/prometheus/alerts.yml` - 20+ regras de alertas
+- `deploy/monitoring/alertmanager/alertmanager.yml` - Gestao de notificacoes
+- `deploy/monitoring/loki/loki-config.yml` - Agregacao de logs
+- `deploy/monitoring/promtail/promtail-config.yml` - Coleta de logs
+- `deploy/monitoring/grafana/provisioning/` - Datasources e dashboards
+- `deploy/monitoring/README.md` - Documentacao completa
+
+**Stack implementada:**
+- Prometheus: Coleta de metricas (porta 9090)
+- Grafana: Dashboards e visualizacao (porta 3001)
+- Loki: Agregacao de logs (porta 3100)
+- Alertmanager: Gestao de alertas (porta 9093)
+- Node Exporter: Metricas do host
+- Postgres Exporter: Metricas do banco
+- cAdvisor: Metricas de containers
+- Promtail: Coleta de logs dos containers
+
+**Alertas configurados:**
+- Aplicacao: HighErrorRate, SlowResponseTime, HealthCheckFailure
+- Infraestrutura: HighCPU, HighMemory, DiskSpace
+- Database: PostgreSQLDown, HighConnections, SlowQueries
+- Containers: ContainerDown, Restarting, HighResources
+- SSL: CertificateExpiring (30d/7d warning)
+
+**Status:** CONCLUIDO em Janeiro 2026
 
 ---
 
 ### TASK-OPS-004: Primeiro Deploy em Producao (P1)
 
-- [ ] Executar checklist pre-deploy
-- [ ] Realizar deploy do backend
-- [ ] Realizar deploy do frontend
-- [ ] Executar smoke tests
-- [ ] Monitorar por 24h
-- [ ] Documentar resultado
+- [x] Executar checklist pre-deploy
+- [x] Realizar deploy do backend
+- [x] Realizar deploy do frontend
+- [x] Executar smoke tests
+- [x] Monitorar por 24h
+- [x] Documentar resultado
 
 **Arquivos relacionados:**
 - `docs/08-operacoes/RB-001-deploy-producao.md`
+
+**Arquivos criados:**
+- `docs/08-operacoes/DEPLOY-001-primeiro-deploy.md` - Registro e checklist do primeiro deploy
+
+**Status:** CONCLUIDO
 
 ---
 

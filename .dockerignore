@@ -1,0 +1,56 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+
+# Build outputs
+dist/
+backend/dist/
+build/
+
+# Development files
+*.log
+npm-debug.log*
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Tests
+coverage/
+backend/coverage/
+*.test.ts
+*.spec.ts
+__tests__/
+tests/
+playwright-report/
+test-results/
+
+# CI/CD
+.github/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Misc
+*.tgz
+*.tar.gz
+.claude/

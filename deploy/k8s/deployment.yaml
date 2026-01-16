@@ -1,0 +1,204 @@
+# ============================================================
+# LIQUID FLOW MONITOR - KUBERNETES DEPLOYMENTS
+# ============================================================
+
+---
+# Backend Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lfm-backend
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    component: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: liquid-flow-monitor
+      component: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: liquid-flow-monitor
+        component: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/YOUR_ORG/liquid-flow-monitor:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: lfm-config
+            - secretRef:
+                name: lfm-secrets
+          env:
+            - name: CORS_ORIGIN
+              value: "https://YOUR_DOMAIN"
+            - name: APP_BASE_URL
+              value: "https://YOUR_DOMAIN"
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      restartPolicy: Always
+
+---
+# Frontend Deployment (Nginx serving static files)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: lfm-frontend
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    component: frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: liquid-flow-monitor
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: liquid-flow-monitor
+        component: frontend
+    spec:
+      containers:
+        - name: nginx
+          image: ghcr.io/YOUR_ORG/liquid-flow-monitor-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      restartPolicy: Always
+
+---
+# PostgreSQL StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    component: database
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: liquid-flow-monitor
+      component: database
+  template:
+    metadata:
+      labels:
+        app: liquid-flow-monitor
+        component: database
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          envFrom:
+            - secretRef:
+                name: lfm-secrets
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: lfm-secrets
+                  key: DB_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: lfm-secrets
+                  key: DB_PASSWORD
+            - name: POSTGRES_DB
+              value: "liquid_flow_monitor"
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "1Gi"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - $(POSTGRES_USER)
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

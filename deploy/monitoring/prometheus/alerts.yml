@@ -1,0 +1,267 @@
+# ============================================================
+# PROMETHEUS ALERTING RULES
+# Liquid Flow Monitor
+# ============================================================
+
+groups:
+  # ==========================================================
+  # APPLICATION ALERTS
+  # ==========================================================
+  - name: application
+    rules:
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) /
+            sum(rate(http_requests_total[5m]))
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | printf \"%.2f\" }}% (threshold: 5%)"
+          runbook: "docs/08-operacoes/RB-002-monitoramento-alertas.md#41-alerta-high-error-rate"
+
+      # Slow Response Time
+      - alert: SlowResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 3
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Slow response time detected"
+          description: "95th percentile response time is {{ $value | printf \"%.2f\" }}s (threshold: 3s)"
+          runbook: "docs/08-operacoes/RB-002-monitoramento-alertas.md#42-alerta-slow-response-time"
+
+      # Health Check Failure
+      - alert: HealthCheckFailure
+        expr: up{job="backend-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Backend health check failing"
+          description: "Backend service is not responding to health checks"
+          runbook: "docs/08-operacoes/RB-002-monitoramento-alertas.md#43-alerta-health-check-failure"
+
+  # ==========================================================
+  # INFRASTRUCTURE ALERTS
+  # ==========================================================
+  - name: infrastructure
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+        for: 15m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.2f\" }}% (threshold: 85%)"
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.2f\" }}% (threshold: 90%)"
+          runbook: "docs/08-operacoes/RB-002-monitoramento-alertas.md#44-alerta-high-memory-usage"
+
+      # Critical Memory Usage
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "Critical memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.2f\" }}% - OOM risk!"
+
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} /
+                node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value | printf \"%.2f\" }}% on {{ $labels.mountpoint }}"
+
+      # Disk Space Critical
+      - alert: DiskSpaceCritical
+        expr: |
+          (1 - (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} /
+                node_filesystem_size_bytes{fstype!~"tmpfs|overlay"})) * 100 > 90
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value | printf \"%.2f\" }}% on {{ $labels.mountpoint }}"
+
+  # ==========================================================
+  # DATABASE ALERTS
+  # ==========================================================
+  - name: database
+    rules:
+      # PostgreSQL Down
+      - alert: PostgreSQLDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL instance is not responding"
+
+      # High Connection Usage
+      - alert: PostgreSQLHighConnections
+        expr: |
+          (pg_stat_activity_count / pg_settings_max_connections) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "High PostgreSQL connection usage"
+          description: "Connection pool usage is {{ $value | printf \"%.2f\" }}%"
+
+      # Critical Connection Usage
+      - alert: PostgreSQLCriticalConnections
+        expr: |
+          (pg_stat_activity_count / pg_settings_max_connections) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          team: dba
+        annotations:
+          summary: "Critical PostgreSQL connection usage"
+          description: "Connection pool usage is {{ $value | printf \"%.2f\" }}% - connection exhaustion risk!"
+
+      # Slow Queries
+      - alert: PostgreSQLSlowQueries
+        expr: |
+          rate(pg_stat_activity_max_tx_duration{datname!~"template.*"}[5m]) > 60
+        for: 5m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "Slow queries detected in PostgreSQL"
+          description: "Queries running longer than 60 seconds detected"
+
+      # Replication Lag (se houver replica)
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag > 30
+        for: 5m
+        labels:
+          severity: warning
+          team: dba
+        annotations:
+          summary: "PostgreSQL replication lag"
+          description: "Replication lag is {{ $value }}s"
+
+  # ==========================================================
+  # CONTAINER ALERTS
+  # ==========================================================
+  - name: containers
+    rules:
+      # Container Down
+      - alert: ContainerDown
+        expr: |
+          absent(container_last_seen{name=~"lfm-.*"})
+        for: 2m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "Container {{ $labels.name }} is down"
+          description: "Container has not been seen for more than 2 minutes"
+
+      # Container High CPU
+      - alert: ContainerHighCPU
+        expr: |
+          (sum(rate(container_cpu_usage_seconds_total{name=~"lfm-.*"}[5m])) by (name) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Container {{ $labels.name }} high CPU"
+          description: "Container CPU usage is {{ $value | printf \"%.2f\" }}%"
+
+      # Container High Memory
+      - alert: ContainerHighMemory
+        expr: |
+          (container_memory_usage_bytes{name=~"lfm-.*"} /
+           container_spec_memory_limit_bytes{name=~"lfm-.*"}) * 100 > 80
+        for: 10m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Container {{ $labels.name }} high memory"
+          description: "Container memory usage is {{ $value | printf \"%.2f\" }}%"
+
+      # Container Restart
+      - alert: ContainerRestarting
+        expr: |
+          increase(container_restart_count{name=~"lfm-.*"}[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Container {{ $labels.name }} restarting frequently"
+          description: "Container has restarted {{ $value }} times in the last hour"
+
+  # ==========================================================
+  # SSL/CERTIFICATE ALERTS
+  # ==========================================================
+  - name: ssl
+    rules:
+      # SSL Certificate Expiring Soon
+      - alert: SSLCertificateExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "SSL certificate expiring soon"
+          description: "SSL certificate expires in {{ $value | printf \"%.0f\" }} days"
+
+      # SSL Certificate Expiring Critical
+      - alert: SSLCertificateExpiringCritical
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 7
+        for: 1h
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "SSL certificate expiring very soon!"
+          description: "SSL certificate expires in {{ $value | printf \"%.0f\" }} days - renew immediately!"

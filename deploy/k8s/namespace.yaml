@@ -1,0 +1,10 @@
+# ============================================================
+# LIQUID FLOW MONITOR - KUBERNETES NAMESPACE
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: liquid-flow-monitor
+  labels:
+    app: liquid-flow-monitor
+    environment: production

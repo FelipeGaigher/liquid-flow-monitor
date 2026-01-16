@@ -1,0 +1,104 @@
+# ============================================================
+# PROMTAIL CONFIGURATION
+# Liquid Flow Monitor - Log Collection Agent
+# ============================================================
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # ==========================================================
+  # DOCKER CONTAINER LOGS
+  # ==========================================================
+  - job_name: containers
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*-json.log
+
+    pipeline_stages:
+      # Parse JSON log format from Docker
+      - json:
+          expressions:
+            log: log
+            stream: stream
+            time: time
+
+      # Extract container name from path
+      - regex:
+          source: filename
+          expression: '/var/lib/docker/containers/(?P<container_id>[^/]+)/.*'
+
+      # Filter only LFM containers
+      - match:
+          selector: '{job="docker"}'
+          stages:
+            - docker: {}
+
+      # Parse application JSON logs
+      - match:
+          selector: '{container_name=~"lfm-.*"}'
+          stages:
+            - json:
+                expressions:
+                  level: level
+                  message: message
+                  timestamp: timestamp
+                  service: service
+                source: log
+            - labels:
+                level:
+                service:
+
+      # Add timestamp
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+
+      # Output
+      - output:
+          source: log
+
+  # ==========================================================
+  # SYSTEM LOGS (opcional)
+  # ==========================================================
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          __path__: /var/log/syslog
+
+  # ==========================================================
+  # NGINX ACCESS LOGS
+  # ==========================================================
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          __path__: /var/log/nginx/*.log
+
+    pipeline_stages:
+      # Parse nginx combined log format
+      - regex:
+          expression: '^(?P<remote_addr>[\d\.]+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]+)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)"'
+
+      - labels:
+          status:
+          remote_addr:
+
+      - timestamp:
+          source: time_local
+          format: '02/Jan/2006:15:04:05 -0700'

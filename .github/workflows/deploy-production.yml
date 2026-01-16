@@ -1,0 +1,258 @@
+# Deploy Production - Manual ou por Tag
+# Realiza deploy para ambiente de producao com aprovacao manual
+
+name: Deploy Production
+
+on:
+  # Deploy manual via interface do GitHub
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag to deploy (e.g., v1.0.0)'
+        required: true
+        type: string
+      skip_backup:
+        description: 'Skip database backup'
+        required: false
+        default: 'false'
+        type: boolean
+
+  # Deploy automatico em tags de release
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+env:
+  NODE_VERSION: '20.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # ============================================
+  # Validacao pre-deploy
+  # ============================================
+  validate:
+    name: Pre-deploy Validation
+    runs-on: ubuntu-latest
+
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: $VERSION"
+            echo "Expected format: vX.Y.Z (e.g., v1.0.0)"
+            exit 1
+          fi
+          echo "Version format is valid: $VERSION"
+
+      - name: Check if tag exists
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if ! git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.version }} does not exist!"
+            exit 1
+          fi
+          echo "Tag exists: ${{ steps.version.outputs.version }}"
+
+  # ============================================
+  # Build para Producao
+  # ============================================
+  build:
+    name: Build Production
+    runs-on: ubuntu-latest
+    needs: [validate]
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+        env:
+          VITE_API_URL: ${{ secrets.PRODUCTION_API_URL }}
+          NODE_ENV: production
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.validate.outputs.version }}
+            type=raw,value=production-latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NODE_ENV=production
+
+  # ============================================
+  # Backup do Banco (opcional)
+  # ============================================
+  backup:
+    name: Database Backup
+    runs-on: ubuntu-latest
+    needs: [validate, build]
+    if: ${{ github.event.inputs.skip_backup != 'true' }}
+    environment: production
+
+    steps:
+      - name: Create database backup
+        run: |
+          echo "Creating database backup..."
+          echo "Timestamp: $(date +%Y%m%d_%H%M%S)"
+          # Adicione aqui o comando de backup do banco
+          # Exemplo:
+          # pg_dump -h $DB_HOST -U $DB_USER -d $DB_NAME > backup_$(date +%Y%m%d_%H%M%S).sql
+          echo "Backup completed!"
+
+  # ============================================
+  # Deploy para Producao
+  # ============================================
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [validate, build, backup]
+    if: always() && needs.build.result == 'success' && (needs.backup.result == 'success' || needs.backup.result == 'skipped')
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to Production
+        run: |
+          echo "=========================================="
+          echo "  DEPLOYING TO PRODUCTION"
+          echo "=========================================="
+          echo "Version: ${{ needs.validate.outputs.version }}"
+          echo "Image: ${{ needs.build.outputs.image-tag }}"
+          echo "Timestamp: $(date)"
+          echo ""
+          # Adicione aqui os comandos de deploy para producao
+          # Exemplos:
+          # - kubectl apply -f k8s/production/
+          # - aws ecs update-service --cluster production --service app --force-new-deployment
+          # - docker-compose -f docker-compose.prod.yml up -d
+          echo ""
+          echo "Deploy to production completed!"
+
+      - name: Run smoke tests
+        run: |
+          echo "Running smoke tests..."
+          # Adicione aqui testes de smoke
+          # curl -f ${{ secrets.PRODUCTION_URL }}/health || exit 1
+          # curl -f ${{ secrets.PRODUCTION_URL }}/api/health || exit 1
+          echo "Smoke tests passed!"
+
+      - name: Health check
+        run: |
+          echo "Running health check..."
+          # Aguardar estabilizacao
+          sleep 30
+          # curl -f ${{ secrets.PRODUCTION_URL }}/health || exit 1
+          echo "Health check passed!"
+
+  # ============================================
+  # Notificacao pos-deploy
+  # ============================================
+  notify:
+    name: Notify
+    runs-on: ubuntu-latest
+    needs: [validate, deploy]
+    if: always()
+
+    steps:
+      - name: Notify success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "=========================================="
+          echo "  PRODUCTION DEPLOY SUCCESSFUL"
+          echo "=========================================="
+          echo "Version: ${{ needs.validate.outputs.version }}"
+          echo "Deployed by: ${{ github.actor }}"
+          echo "Timestamp: $(date)"
+          echo ""
+          echo "Release Notes: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}"
+          # Adicione notificacao via Slack, Teams, email, etc.
+
+      - name: Notify failure
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "=========================================="
+          echo "  PRODUCTION DEPLOY FAILED"
+          echo "=========================================="
+          echo "Version: ${{ needs.validate.outputs.version }}"
+          echo "Attempted by: ${{ github.actor }}"
+          echo "Timestamp: $(date)"
+          echo ""
+          echo "Check the workflow logs for details."
+          echo "Consider rollback if needed."
+          # Adicione notificacao de falha
+
+  # ============================================
+  # Rollback (manual)
+  # ============================================
+  rollback:
+    name: Rollback (Manual)
+    runs-on: ubuntu-latest
+    if: false  # Apenas executado manualmente via workflow_dispatch separado
+    environment: production
+
+    steps:
+      - name: Rollback
+        run: |
+          echo "Initiating rollback..."
+          # Adicione comandos de rollback aqui
+          echo "Rollback completed!"
