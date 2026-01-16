@@ -385,14 +385,36 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 
 ### TASK-FEAT-001: Implementar Exportacao PDF (P2)
 
-- [ ] Escolher biblioteca (pdfmake, puppeteer, etc)
-- [ ] Implementar geracao de relatorio de vendas em PDF
-- [ ] Implementar geracao de relatorio de estoque em PDF
-- [ ] Implementar geracao de relatorio financeiro em PDF
-- [ ] Testar formatacao e layout
+- [x] Escolher biblioteca (pdfmake, puppeteer, etc)
+- [x] Implementar geracao de relatorio de vendas em PDF
+- [x] Implementar geracao de relatorio de estoque em PDF
+- [x] Implementar geracao de relatorio financeiro em PDF
+- [x] Testar formatacao e layout
 
 **Arquivos relacionados:**
 - `docs/02-requisitos-casos-uso/UC-007-exportar-relatorios.md`
+
+**Arquivos criados:**
+- `src/lib/pdf-generator.ts` - Utilitario de geracao de PDFs com jsPDF e jspdf-autotable
+
+**Arquivos modificados:**
+- `src/pages/Reports.tsx` - Pagina de relatorios com filtros de periodo e exportacao CSV/PDF
+- `package.json` - Adicionadas dependencias jspdf e jspdf-autotable
+
+**Bibliotecas adicionadas:**
+- `jspdf` - Geracao de documentos PDF no frontend
+- `jspdf-autotable` - Plugin para tabelas formatadas em PDF
+
+**Funcionalidades implementadas:**
+- Relatorio de Vendas (PDF/CSV) - Volume, valor, lucro, margem por periodo
+- Relatorio de Estoque (PDF/CSV) - Posicao atual dos tanques com valor estimado
+- Relatorio Financeiro (PDF/CSV) - KPIs financeiros e faturamento por produto
+- Relatorio de Movimentacoes (PDF/CSV) - Historico detalhado com filtros
+- Filtros de periodo (hoje, semana, mes, 3m, 6m, ano, personalizado)
+- Cabecalho com logo, data e paginacao
+- Cores e formatacao profissional
+
+**Status:** CONCLUIDO em Janeiro 2026
 
 ---
 

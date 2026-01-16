@@ -94,9 +94,29 @@ function getMockState(): MockState {
 }
 
 function isOfflineError(error: unknown): boolean {
+  // TypeError é lançado quando fetch falha (conexão recusada, sem rede, etc)
   if (error instanceof TypeError) return true;
-  const message = error instanceof Error ? error.message : "";
-  return message.includes("Failed to fetch") || message.includes("NetworkError");
+
+  // Verificar se é um erro de rede pelo nome
+  if (error instanceof Error) {
+    const name = error.name.toLowerCase();
+    const message = error.message.toLowerCase();
+
+    if (
+      name.includes("type") ||
+      name.includes("network") ||
+      message.includes("failed to fetch") ||
+      message.includes("networkerror") ||
+      message.includes("network request failed") ||
+      message.includes("err_connection") ||
+      message.includes("err_network") ||
+      message.includes("fetch")
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 function getStoredTokens(): AuthTokens | null {
@@ -816,19 +836,81 @@ export async function getCurrentPrice(product: ProductType): Promise<number | nu
   }
 }
 
+// Mock de usuarios para autenticacao offline
+const mockAuthUsers = [
+  { id: "user-1", email: "admin@tankcontrol.com", password: "admin123", name: "Administrador", role: "admin" as const },
+  { id: "user-2", email: "operador@tankcontrol.com", password: "operador123", name: "Operador", role: "operador" as const },
+  { id: "user-3", email: "viewer@tankcontrol.com", password: "viewer123", name: "Visualizador", role: "viewer" as const },
+];
+
+// Variavel para armazenar usuario logado no modo mock
+let mockLoggedUser: typeof mockAuthUsers[0] | null = null;
+
+function mockLogin(email: string, password: string) {
+  const user = mockAuthUsers.find((u) => u.email === email && u.password === password);
+  if (!user) {
+    throw new ApiError("Email ou senha invalidos", 401, "INVALID_CREDENTIALS");
+  }
+
+  mockLoggedUser = user;
+
+  // Gerar tokens mock
+  const mockTokens = {
+    accessToken: `mock-access-${Date.now()}`,
+    refreshToken: `mock-refresh-${Date.now()}`,
+  };
+  storeTokens(mockTokens);
+
+  return {
+    access_token: mockTokens.accessToken,
+    refresh_token: mockTokens.refreshToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+      status: "active" as const,
+    },
+  };
+}
+
 export async function login(email: string, password: string) {
-  const response = await apiRequest<any>("/auth/login", {
-    method: "POST",
-    auth: false,
-    body: { email, password },
-  });
+  try {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    });
 
-  storeTokens({
-    accessToken: response.access_token,
-    refreshToken: response.refresh_token,
-  });
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new ApiError(
+        errorBody?.error?.message || "Falha na autenticacao",
+        response.status,
+        errorBody?.error?.code
+      );
+    }
 
-  return response;
+    const data = await response.json();
+    storeTokens({
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+    });
+
+    return data;
+  } catch (error) {
+    // Fallback para modo offline - autenticacao mockada
+    // Captura qualquer erro de rede (TypeError, fetch failed, etc)
+    if (error instanceof TypeError || (error instanceof Error && error.message.toLowerCase().includes("fetch"))) {
+      console.log("[Auth] Backend offline, usando autenticacao mock");
+      return mockLogin(email, password);
+    }
+    // Se for ApiError (credenciais invalidas), propagar
+    throw error;
+  }
 }
 
 export async function logout() {
@@ -843,7 +925,29 @@ export async function logout() {
 }
 
 export async function getCurrentUser() {
-  return apiRequest("/auth/me");
+  const tokens = getStoredTokens();
+
+  // Se o token é mock, retornar usuario mock diretamente
+  if (tokens?.accessToken?.startsWith("mock-") && mockLoggedUser) {
+    return {
+      id: mockLoggedUser.id,
+      email: mockLoggedUser.email,
+      name: mockLoggedUser.name,
+      role: mockLoggedUser.role,
+      status: "active" as const,
+    };
+  }
+
+  try {
+    return await apiRequest("/auth/me");
+  } catch (error) {
+    // Fallback para modo offline
+    if (error instanceof TypeError || (error instanceof Error && error.message.toLowerCase().includes("fetch"))) {
+      // Se não há usuario mock logado, limpar tokens
+      clearTokens();
+    }
+    throw error;
+  }
 }
 
 export async function changePassword(currentPassword: string, newPassword: string) {
