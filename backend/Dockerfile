@@ -5,18 +5,20 @@
 # ============================================================
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-bullseye-slim AS builder
 
 WORKDIR /app
 
 # Instalar dependencias de build
-RUN apk add --no-cache python3 make g++
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copiar arquivos de dependencias
 COPY package*.json ./
 
 # Instalar todas as dependencias (incluindo devDependencies para build)
-RUN npm install
+RUN corepack enable && corepack prepare pnpm@8.15.1 --activate \
+    && pnpm install --frozen-lockfile=false
 
 # Copiar codigo fonte
 COPY . .
@@ -25,7 +27,7 @@ COPY . .
 RUN ./node_modules/.bin/tsc
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:20-bullseye-slim AS production
 
 WORKDIR /app
 

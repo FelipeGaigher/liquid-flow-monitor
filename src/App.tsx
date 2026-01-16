@@ -10,6 +10,7 @@ import { Layout } from "@/components/Layout";
 import { RequireAuth } from "@/components/RequireAuth";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import IotDevices from "./pages/IotDevices";
 import Tanks from "./pages/Tanks";
 import Movements from "./pages/Movements";
 import ProductsPrices from "./pages/ProductsPrices";
@@ -35,6 +36,7 @@ const App = () => (
                   <Route path="/" element={<Layout />}>
                     <Route index element={<Navigate to="/dashboard" replace />} />
                     <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="iot-devices" element={<IotDevices />} />
                     <Route path="tanks" element={<Tanks />} />
                     <Route path="movements" element={<Movements />} />
                     <Route path="products-prices" element={<ProductsPrices />} />

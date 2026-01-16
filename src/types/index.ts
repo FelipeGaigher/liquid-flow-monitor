@@ -74,3 +74,29 @@ export interface KPIs {
   profitGrowth: number;
   volumeGrowth: number;
 }
+
+export interface IotDevice {
+  id: string;
+  name: string;
+  tank_id?: string | null;
+  tank_name?: string | null;
+  status: "active" | "inactive";
+  last_seen_at?: string | null;
+  last_volume_l?: number | null;
+}
+
+export interface IotMeasurement {
+  id: string;
+  device_id: string;
+  tank_id: string;
+  volume_l: number;
+  measured_at: string;
+  received_at?: string;
+}
+
+export interface IotSummary {
+  total: number;
+  online: number;
+  offline: number;
+  latestMeasurements: IotMeasurement[];
+}

@@ -1,10 +1,10 @@
-import { DashboardFilters, KPIs, Movement, ProductType, Tank, User, Site, PriceList } from "@/types";
-import { mockMovements, mockPriceLists, mockSites, mockTanks, mockUsers } from "@/mocks/seed";
+import { DashboardFilters, KPIs, Movement, ProductType, Tank, User, Site, PriceList, IotDevice, IotMeasurement, IotSummary } from "@/types";
+import { mockMovements, mockPriceLists, mockSites, mockTanks, mockUsers, mockIotDevices, mockIotMeasurements } from "@/mocks/seed";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000/api";
 const TOKEN_STORAGE_KEY = "lfm.auth";
 const MOCK_STORAGE_KEY = "lfm.mock";
-const MOCK_VERSION = 1;
+const MOCK_VERSION = 2;
 
 type MockProduct = { id: string; name: string; type: ProductType; status: "active" | "inactive" };
 
@@ -16,6 +16,8 @@ type MockState = {
   users: User[];
   priceLists: PriceList[];
   products: MockProduct[];
+  iotDevices: IotDevice[];
+  iotMeasurements: IotMeasurement[];
 };
 
 let inMemoryMockState: MockState | null = null;
@@ -51,6 +53,8 @@ function buildMockSeed(): MockState {
     movements: clone(mockMovements),
     users: clone(mockUsers),
     priceLists: clone(mockPriceLists),
+    iotDevices: clone(mockIotDevices),
+    iotMeasurements: clone(mockIotMeasurements),
     products: [
       { id: "prod-1", name: "Álcool", type: "Álcool", status: "active" },
       { id: "prod-2", name: "Cachaça", type: "Cachaça", status: "active" },
@@ -317,6 +321,51 @@ function mapMovementFromApi(payload: any): Movement {
   };
 }
 
+const IOT_ONLINE_THRESHOLD_MINUTES = 10;
+
+function mapIotDeviceFromApi(payload: any): IotDevice {
+  return {
+    id: payload.id,
+    name: payload.name,
+    tank_id: payload.tank_id ?? null,
+    tank_name: payload.tank_name ?? null,
+    status: payload.status,
+    last_seen_at: payload.last_seen_at ?? null,
+    last_volume_l: payload.last_volume_l !== undefined && payload.last_volume_l !== null
+      ? Number(payload.last_volume_l)
+      : null,
+  };
+}
+
+function mapIotMeasurementFromApi(payload: any): IotMeasurement {
+  return {
+    id: payload.id,
+    device_id: payload.device_id,
+    tank_id: payload.tank_id,
+    volume_l: Number(payload.volume_l),
+    measured_at: payload.measured_at,
+    received_at: payload.received_at ?? undefined,
+  };
+}
+
+function buildMockIotSummary(state: MockState): IotSummary {
+  const threshold = Date.now() - IOT_ONLINE_THRESHOLD_MINUTES * 60 * 1000;
+  const online = state.iotDevices.filter((device) =>
+    device.last_seen_at ? new Date(device.last_seen_at).getTime() >= threshold : false
+  ).length;
+
+  const latestMeasurements = [...state.iotMeasurements]
+    .sort((a, b) => new Date(b.measured_at).getTime() - new Date(a.measured_at).getTime())
+    .slice(0, 10);
+
+  return {
+    total: state.iotDevices.length,
+    online,
+    offline: state.iotDevices.length - online,
+    latestMeasurements,
+  };
+}
+
 const dayLabels = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
 
 function resolvePeriod(filters: DashboardFilters) {
@@ -562,6 +611,33 @@ export async function getDashboardData(filters: DashboardFilters) {
   } catch (error) {
     if (isOfflineError(error)) {
       return buildMockDashboard(filters);
+    }
+    throw error;
+  }
+}
+
+export async function listIotDevices(): Promise<IotDevice[]> {
+  try {
+    const response = await apiRequest<{ data: any[] }>("/iot/devices");
+    return response.data.map(mapIotDeviceFromApi);
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return getMockState().iotDevices;
+    }
+    throw error;
+  }
+}
+
+export async function getIotSummary(): Promise<IotSummary> {
+  try {
+    const response = await apiRequest<IotSummary>("/iot/devices/summary");
+    return {
+      ...response,
+      latestMeasurements: response.latestMeasurements.map(mapIotMeasurementFromApi),
+    };
+  } catch (error) {
+    if (isOfflineError(error)) {
+      return buildMockIotSummary(getMockState());
     }
     throw error;
   }

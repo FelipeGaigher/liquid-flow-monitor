@@ -5,6 +5,8 @@ import { logger } from './utils/logger.js';
 import { testConnection } from './config/database.js';
 import { authService } from './services/auth.service.js';
 import { auditLogsService } from './services/audit-logs.service.js';
+import { iotService, IotError } from './services/iot.service.js';
+import { TankError } from './services/tanks.service.js';
 
 const app = express();
 
@@ -67,6 +69,69 @@ app.get('/api/audit-logs', requireAdmin, async (req, res, next) => {
     res.json(result);
   } catch (error) {
     next(error);
+  }
+});
+
+const respondIotError = (res: express.Response, error: unknown) => {
+  if (error instanceof IotError) {
+    return res.status(error.status).json({
+      error: {
+        message: error.message,
+        code: error.code,
+      },
+    });
+  }
+  if (error instanceof TankError) {
+    return res.status(400).json({
+      error: {
+        message: error.message,
+        code: error.code,
+      },
+    });
+  }
+  return res.status(500).json({
+    error: {
+      message: 'Erro interno',
+      code: 'INTERNAL_ERROR',
+    },
+  });
+};
+
+app.post('/api/iot/devices', requireAdmin, async (req, res) => {
+  try {
+    const { name, tank_id } = req.body ?? {};
+    const result = await iotService.createDevice({ name, tank_id });
+    res.status(201).json(result);
+  } catch (error) {
+    respondIotError(res, error);
+  }
+});
+
+app.get('/api/iot/devices', requireAdmin, async (req, res) => {
+  try {
+    const devices = await iotService.listDevices();
+    res.json({ data: devices });
+  } catch (error) {
+    respondIotError(res, error);
+  }
+});
+
+app.get('/api/iot/devices/summary', requireAdmin, async (req, res) => {
+  try {
+    const summary = await iotService.getSummary();
+    res.json(summary);
+  } catch (error) {
+    respondIotError(res, error);
+  }
+});
+
+app.post('/api/iot/measurements', async (req, res) => {
+  try {
+    const apiKey = String(req.headers['x-api-key'] || '');
+    const measurement = await iotService.recordMeasurement(req.body ?? {}, apiKey, req.ip);
+    res.status(201).json(measurement);
+  } catch (error) {
+    respondIotError(res, error);
   }
 });
 

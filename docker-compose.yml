@@ -37,11 +37,10 @@ services:
   # BACKEND - Node.js API
   # ==========================================================
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: node:20-bullseye-slim
     container_name: lfm-backend
     restart: unless-stopped
+    working_dir: /app
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: ${API_PORT:-3000}
@@ -68,7 +67,38 @@ services:
       - lfm-network
     volumes:
       - ./backend:/app
-      - /app/node_modules
+
+  # ==========================================================
+  # CACHE - Redis
+  # ==========================================================
+  redis:
+    image: redis:7-alpine
+    container_name: lfm-redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lfm-network
+
+  # ==========================================================
+  # GRAFANA - Dashboards (sem provisioning por padrao)
+  # ==========================================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: lfm-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - lfm-network
 
   # ==========================================================
   # PGADMIN - Database Management (opcional)
@@ -95,6 +125,10 @@ services:
 # ==========================================================
 volumes:
   postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  grafana_data:
     driver: local
 
 # ==========================================================

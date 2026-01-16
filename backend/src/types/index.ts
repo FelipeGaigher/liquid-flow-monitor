@@ -162,3 +162,25 @@ export interface AuditLog {
   ip_address?: string | null;
   created_at: Date;
 }
+
+export interface IotDevice {
+  id: string;
+  name: string;
+  tank_id?: string | null;
+  api_key_hash: string;
+  status: 'active' | 'inactive';
+  last_seen_at?: Date | null;
+  last_volume_l?: number | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface IotMeasurement {
+  id: string;
+  device_id: string;
+  tank_id: string;
+  volume_l: number;
+  measured_at: Date;
+  received_at: Date;
+  raw_payload?: Record<string, unknown> | null;
+}

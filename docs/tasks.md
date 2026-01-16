@@ -651,11 +651,13 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 
 ### TASK-ROAD-001: Integracao com Sensores IoT (P3)
 
-- [ ] Definir protocolo (REST/MQTT)
-- [ ] Criar API para receber dados de sensores
-- [ ] Implementar autenticacao de dispositivos
-- [ ] Implementar atualizacao automatica de volume
-- [ ] Criar dashboard de dispositivos
+- [x] Definir protocolo (REST/MQTT)
+- [x] Criar API para receber dados de sensores
+- [x] Implementar autenticacao de dispositivos
+- [x] Implementar atualizacao automatica de volume
+- [x] Criar dashboard de dispositivos
+
+**Status:** CONCLUIDO
 
 ---
 
@@ -672,6 +674,12 @@ Este documento lista todas as tarefas necessarias para implementar o projeto Liq
 - [ ] Mapear APIs de ERP alvo
 - [ ] Implementar sincronizacao de dados
 - [ ] Implementar webhooks
+
+---
+
+## Lista de Tasks Pendentes (com prioridade)
+
+- [ ] TASK-OPS-004: Primeiro Deploy em Producao (P1)
 
 ---
 

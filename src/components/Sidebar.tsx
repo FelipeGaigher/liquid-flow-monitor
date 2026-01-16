@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
+  Cpu,
   Droplet,
   ArrowLeftRight,
   Package,
@@ -12,6 +13,7 @@ import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/iot-devices", label: "Dispositivos IoT", icon: Cpu },
   { to: "/tanks", label: "Tanques", icon: Droplet },
   { to: "/movements", label: "Movimentações", icon: ArrowLeftRight },
   { to: "/products-prices", label: "Produtos & Preços", icon: Package },

@@ -1,4 +1,4 @@
-import { Tank, Site, Movement, PriceList, User, ProductType, MovementType } from "@/types";
+import { Tank, Site, Movement, PriceList, User, ProductType, MovementType, IotDevice, IotMeasurement } from "@/types";
 
 // Sites
 export const mockSites: Site[] = [
@@ -68,6 +68,58 @@ export const mockTanks: Tank[] = [
     min_alert_l: 14000,
     site_id: "site-3",
     status: "active",
+  },
+];
+
+const now = Date.now();
+
+// IoT devices
+export const mockIotDevices: IotDevice[] = [
+  {
+    id: "iot-1",
+    name: "Sensor Tanque A1",
+    tank_id: "tank-1",
+    tank_name: "Tanque A1",
+    status: "active",
+    last_seen_at: new Date(now - 2 * 60 * 1000).toISOString(),
+    last_volume_l: 38500,
+  },
+  {
+    id: "iot-2",
+    name: "Sensor Tanque A2",
+    tank_id: "tank-2",
+    tank_name: "Tanque A2",
+    status: "active",
+    last_seen_at: new Date(now - 18 * 60 * 1000).toISOString(),
+    last_volume_l: 62000,
+  },
+  {
+    id: "iot-3",
+    name: "Sensor Tanque C1",
+    tank_id: "tank-3",
+    tank_name: "Tanque C1",
+    status: "inactive",
+    last_seen_at: null,
+    last_volume_l: null,
+  },
+];
+
+export const mockIotMeasurements: IotMeasurement[] = [
+  {
+    id: "iotm-1",
+    device_id: "iot-1",
+    tank_id: "tank-1",
+    volume_l: 38500,
+    measured_at: new Date(now - 2 * 60 * 1000).toISOString(),
+    received_at: new Date(now - 2 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "iotm-2",
+    device_id: "iot-2",
+    tank_id: "tank-2",
+    volume_l: 62000,
+    measured_at: new Date(now - 18 * 60 * 1000).toISOString(),
+    received_at: new Date(now - 18 * 60 * 1000).toISOString(),
   },
 ];
 

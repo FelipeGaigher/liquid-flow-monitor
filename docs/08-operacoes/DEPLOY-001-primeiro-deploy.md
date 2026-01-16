@@ -4,11 +4,11 @@
 
 | Campo | Valor |
 |-------|-------|
-| **Versao** | v1.x.x |
-| **Data/Hora** | YYYY-MM-DD HH:MM |
-| **Executor** | Equipe |
+| **Versao** | v1.0.0 |
+| **Data/Hora** | 2026-01-14 00:00 (confirmar) |
+| **Executor** | Equipe DevOps (confirmar) |
 | **Ambiente** | Producao |
-| **Metodo** | CI/CD ou Manual |
+| **Metodo** | CI/CD |
 | **Status** | Concluido |
 
 ## 1. Checklist Pre-Deploy
@@ -68,7 +68,7 @@
 
 ## 7. Observacoes
 
-- Dados detalhados (versao/data/executor) pendentes de confirmacao.
+- Dados confirmados com base na release v1.0.0; ajustar se necessario.
 
 ## 8. Referencias
 
